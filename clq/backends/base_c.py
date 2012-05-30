@@ -458,7 +458,8 @@ class StrType(ScalarType):
 
 
 """ Note that the GrammarType class is paramterized by a regular expression; GrammarTypes
-    are equivalent up to their regular expressions. """
+    are equivalent up to their regular expressions. Inherit from StrType because the 
+    generate methods are going to be habndled identically -- only typechecking changes. """
 class GrammarType(StrType):
     #TODO: Special interning based upon equivalence of regex, so that
     #the set of grammar types is in correspondence with the regular languages.
@@ -466,9 +467,39 @@ class GrammarType(StrType):
         super(GrammarType,self).__init__(name)
         self._regex = regex
     
+    @cypy.memoize #TODO: regex should not change?    
     def get_regex(self):
         return _regex
     
+    """ TODO: Returns the largest Grammar type which is a subtype of left_type and contains
+        and string that could be the result of applying op to self, right_type. Returns
+        None if the latter case never holds """
+    #@cypy.memoize #This computation will be rather lengthy.
+    def largest_subtype(self, op, right_type):
+        return None
+    
+    def resolve_BinOp(self,context,node):
+        right_type = node.right.unresolved_type.resolve(context)
+        try:
+            return self._resolve_BinOp(node.op, right_type, context.backend)
+        except TypeResolutionError as e:
+            if e.node is None:
+                e.node = node
+            raise e
+
+    def _resolve_BinOp(self, op, right_type, backend):
+        if not isinstance(right_type, GrammarType):
+            raise TypeResolutionError("Grammar Contantenation is undefined on type %s" % self.name,None)
+        
+        curr_type = right_type
+        prev_type = None
+        while curr_type.__class__ != prev_type.__class__:
+            prev_type = curr_type
+            curr_type = self.largest_subtype(op, right_type)
+            if curr_type != None:
+                return curr_type
+                    
+        raise TypeResolutionError("GResult of operation does not include %s" % self.name,None)
 
 class IntegerType(ScalarType):
     unsigned = False
