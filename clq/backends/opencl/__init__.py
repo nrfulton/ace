@@ -336,7 +336,11 @@ class Backend(base_c.Backend):
     uint_t = uint
     float_t = float
     bool_t = bool
+<<<<<<< HEAD
     string_t = string # TODO: char.private_ptr
+=======
+    string_t = None # char.private_ptr
+>>>>>>> parent of 07ab264... i dunno
 
 #############################################################################
 ## OpenCL Extension descriptors
