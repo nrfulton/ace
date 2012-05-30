@@ -78,6 +78,18 @@ class BoolType(base_c.BoolType, Type):
 bool = BoolType()
 
 #===============================================================================
+# Strings
+#===============================================================================
+class StrType(base_c.StrType, ScalarType):
+    @classmethod
+    def _make_type(cls, name):
+        s = StrType(name)
+        return s
+
+# TODO is this right and/or should it go in base_c?
+string = StrType._make_type('char*')
+
+#===============================================================================
 # Integers
 #===============================================================================
 class IntegerType(base_c.IntegerType, ScalarType):
@@ -314,7 +326,7 @@ class Backend(base_c.Backend):
     uint_t = uint
     float_t = float
     bool_t = bool
-    string_t = None # TODO: char.private_ptr
+    string_t = string # TODO: char.private_ptr
 
 #############################################################################
 ## OpenCL Extension descriptors
