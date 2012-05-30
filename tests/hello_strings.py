@@ -7,6 +7,6 @@ OpenCL = ocl.Backend()
 def plus(a, b):
     return a + b
 
-plus_ii = plus.compile(OpenCL, ocl.string, ocl.string)
+plus_ii = plus.compile(OpenCL, ocl.string, ocl.grammar("..."))
 
 print plus_ii.program_item.code

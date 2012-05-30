@@ -456,6 +456,20 @@ class StrType(ScalarType):
             code=code
        )
 
+
+""" Note that the GrammarType class is paramterized by a regular expression; GrammarTypes
+    are equivalent up to their regular expressions. """
+class GrammarType(StrType):
+    #TODO: Special interning based upon equivalence of regex, so that
+    #the set of grammar types is in correspondence with the regular languages.
+    def __init__(self, name, regex):
+        super(GrammarType,self).__init__(name)
+        self._regex = regex
+    
+    def get_regex(self):
+        return _regex
+    
+
 class IntegerType(ScalarType):
     unsigned = False
     """A boolean indicating whether this is an unsigned integer type."""

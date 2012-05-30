@@ -87,7 +87,17 @@ class StrType(base_c.StrType, ScalarType):
         return s
 
 # TODO is this right and/or should it go in base_c?
-string = StrType._make_type('char*')
+_str_name = 'char*'
+string = StrType._make_type(_str_name)
+
+#===============================================================================
+# Regular Grammars
+#===============================================================================
+class GrammarType(base_c.GrammarType):
+    pass
+
+def grammar(regex):
+    return GrammarType(_str_name, regex)
 
 #===============================================================================
 # Integers
