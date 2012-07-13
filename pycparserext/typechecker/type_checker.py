@@ -1,23 +1,84 @@
 import pycparser
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
-import cypy
+#import cypy
 
 ################################################################################
 #                                        TYPES                                 #
 ################################################################################
+#TODO Make Type abstract and factor out the class methods into something OpenCL specific.
 class Type:
     """An OpenCL Type."""
     def __init__(self, name):
-        self.name = name
+        """Initialized a new Type; based on Decl in pycparser/c_ast.cfg
+        
+        name: declaration type
+        quals: list of qualifiers (const, volatile)
+        funcspec: list function specifiers (i.e. inline in C99)
+        storage: list of storage specifiers (extern, register, etc.)
+        bitsize: bit field size, or None
+        """
+        self.name     = name
+        self.quals    = list()
+        self.storage  = list()
+        self.funcspec = list()
+        self.bitsize  = None 
+        
+        #Array types
+        self.is_array = False
+        self.dim      = None
+        
+    def __str__(self):
+        name = ""
+        for q in self.quals:
+            name = name + "%s " % q
+        for s in self.storage:
+            name = name + "%s " % s
+        for f in self.funcspec:
+            name = name + "%s " % f
+        if self.is_array:
+            name = name + "[%s] " % self.dim
+        name = name + "%s" % self.name
+        return name
 
+
+    def add_qual(self, qual):
+        #TODO check
+        self.quals.append(qual)
+    
+    def add_storage_spec(self, s):
+        #TODO check
+        self.storage.append(s)
+    
+    def set_bitsize(self, bitsize):
+        #TODO check
+        self.bitsize = bitsize
+    
+    @classmethod
+    def check_cond_type(cls, type):
+        #TODO types.
+        return cls.get_cond_type() == type
+    
+    @classmethod
+    def get_cond_type(cls):
+        return Type("bool")
+    
+    @classmethod
+    def check_dim_type(cls, type):
+        """Ensures Type is a valid expression for an array dimension"""
+        return Type("int") == type
+    
     @classmethod
     def get_op_type(cls, op, values):
-        """Implements all operations, including assignment."""                  #TODO implement
+        """Typechecks and resolves types for ops, including assignment."""
+        #TODO types.
+        if(op == "=="):
+            return cls.get_cond_type()
         return values[0]
-        
+
     def eq(self, other):
-        """This is incorrect. TODO."""                                          #TODO implement according to typechecking rules codified in Ace.
+        """This is incorrect. TODO."""
+        #TODO types. implement according to typechecking rules codified in Ace.
         if not isinstance(other, Type): return False
         return str(self.name) == str(other.name)
     
@@ -25,7 +86,8 @@ class Type:
         return self.eq(other)
     def __cmp__(self,other):
         return self.eq(other)
-
+    
+    
 class FunctionType(Type):
     """A function type in the target language. 
 
@@ -60,7 +122,8 @@ class Variable(object):
         
     def add_scope(self, scope, type):
         if not isinstance(type, Type):
-            raise TargetTypeCheckException("type must by a Type.", node)    
+            raise TargetTypeCheckException(
+             "Expecting an instance of Type but got %s" % type.__class__,None)    
         self.scope.append(scope)
         self.type[scope] = type
 
@@ -83,11 +146,14 @@ class Context(object):
     functions aren't treated a values. 
     """
     def __init__(self):
-        self.returning  = False   #True iff checker is inside a return stmt
-        self.functions  = list()  #stack, determines type of returning func.  
-        self._variables = dict()  #name -> Variable
-        self._scope     = list()  #stack.
+        self.returning   = False   #True iff checker is inside a return stmt
+        self.functions   = list()  #stack, determines type of returning func.  
+        self._variables  = dict()  #name -> Variable
+        self._scope      = list()  #stack.
         self._scope.append(0)
+        
+        #Context variables specific to a statement's form.
+        self.switch_type = Type(None) #Type of switch condition.
     
     def get_variable(self, variable_name):
         if self._variables.has_key(variable_name):
@@ -160,9 +226,99 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_FileAST(self, node):
         self.visit_children(node)
     
-#    def visit_ParamList(self, node):
-#        self.visit_children(node)
+    def visit_Default(self, node):
+        self.visit_children(node)
+    
+    def visit_DoWhile(self, node):
+        """Ensures conditional has correct type and statement is well-typed."""
+        cond_type = self.visit(node.cond)
+        if not Type.check_cond_type(cond_type):
+            raise TargetTypeCheckException(
+                        "Expected condition (%s or similar) but found %s" %
+                        (str(Type.get_cond_type()), str(cond_type)), node)
+        self._g.change_scope()
+        self.visit(node.stmt)
+        self._g.leave_scope()
         
+    def visit_While(self, node):
+        return self.visit_DoWhile(node)
+
+    def visit_For(self, node):
+        self._g.change_scope()
+                
+        self.visit(node.init)
+                
+        cond_type = self.visit(node.cond)
+        if not Type.check_cond_type(cond_type):
+            raise TargetTypeCheckException(
+                        "Expected condition of for to be %s but found %s" %
+                        (str(Type.get_cond_type()), str(cond_type)), node)
+        
+        self.visit(node.next)
+        self.visit(node.stmt)
+        
+        self._g.leave_scope()
+        
+    
+    def visit_Goto(self, node):
+        self.visit_children(node)
+    def visit_Label(self, node):
+        self.visit_children(node)
+
+    def visit_TernaryOp(self, node):
+        """Ensures conditional is correct type and expression types match."""
+        cond_type = self.visit(node.cond)
+        if not Type.check_cond_type(cond_type):
+            raise TargetTypeCheckException(
+                        "Expected condition of ternary to be %s but found %s" %
+                        (str(Type.get_cond_type()), str(cond_type)), node)
+        
+        t_t = self.visit(node.iftrue)
+        f_t = self.visit(node.iffalse)
+        if not t_t == f_t:
+            raise TargetTypeCheckException(
+                        "Ternary condition expressions %s and %s don't match" %
+                        (str(t_t), str(f_t)), node)
+        
+        return t_t
+    
+    def visit_Switch(self, node):
+        """Adds switch to the context."""
+        cond_type = self.visit(node.cond)
+        self._g.switch_type = cond_type
+#        if not cond_type == Type.get_cond_type():
+#            raise TargetTypeCheckException(
+#                "Expected conditional type for switch condition but found %s"% 
+#                cond_type, node)
+        
+        #Visit each case statement.
+        self.visit(node.stmt)
+        self._g.switch_type = Type(None)
+    
+    def visit_Case(self, node):
+        label_t = self.visit(node.expr)
+        if not self._g.switch_type == label_t:
+            raise TargetTypeCheckException(
+                                "Case label of type %s does not reduce to %s"%
+                                (str(label_t), str(self._g.switch_type)), node) 
+        for s in node.stmts:
+            self.visit(s)
+    
+    def visit_If(self, node):
+        cond_type = self.visit(node.cond)
+        if not Type.check_cond_type(cond_type):
+            raise TargetTypeCheckException(
+                "Expected conditional type for if condition but found %s"% 
+                cond_type, node)
+        
+        self._g.change_scope()
+        self.visit(node.iftrue)
+        self._g.leave_scope()
+        self._g.change_scope()
+        if not node.iffalse == None: #else portion is optional.
+            self.visit(node.iffalse)
+        self._g.leave_scope()
+
     def visit_FuncDef(self, node):
         """Function definition."""
         # Get the function's name and return type.
@@ -208,7 +364,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         if not return_type == f.return_type:
             raise TargetTypeCheckException(
                         "returning from %s expected %s but got %s" %
-                        (f.name, f.return_type.name, return_type.name), node)
+                        (str(f), str(f.return_type), str(return_type)), node)
     
     def visit_FuncCall(self, node):
         func_type = self._g.get_variable(
@@ -216,21 +372,22 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         #Get the parameter types
         param_types = list()
-        for e in node.args.exprs:
-            param_types.append(self.visit(e))
+        if not node.args == None:
+            for e in node.args.exprs:
+                param_types.append(self.visit(e))
         
         # Ensure that the parameter lists are the same size
         if not len(param_types) == len(func_type.param_types):
             raise TargetTypeCheckException(
                     "Wrong number of arguments passed to %s" %
-                    (func_type.name), node)
+                    (str(func_type)), node)
         
         # Ensure that parameter types match declared parameter types.
         for p,ep in zip(param_types, func_type.param_types):
             if not p == ep:
                 raise TargetTypeCheckException(
                         "Arguments to %s are incorrect: expected %s but got %s"%
-                        (func_type.name,p,ep), node)
+                        (str(func_type),p,ep), node)
         
         # Return the return type.
         return func_type.return_type 
@@ -239,42 +396,74 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         pass
     
     def visit_Decl(self, node):
-        #                                                                        TODO Implement all the other C99 junk
         """Adds a declared variable to the context."""
         name = node.name
+
+        #Get the base type
         type = self.visit(node.type)
-        initial_value_type = self.visit(node.init)
         
-        #Ensure that type of the initial value matches the declared type. 
-        if not type == initial_value_type:
-            raise TargetTypeCheckException(
-            "Incompatable types when assigning to %s (type: %s) from type %s" % 
-            (name, type.name, initial_value_type.name), node)
+        #Enrich the type with c99 goodness.
+        if not node.quals == None:
+            for q in node.quals:
+                type.add_qual(q)
+        if not node.storage == None:
+            for s in node.storage:
+                type.add_storage_spec(s)
+        if not node.bitsize == None:
+            type.set_bitsize(node.bitsize)
         
         self._g.add_variable(name, type, node)
-    
-    def visit_Constant(self, node):
-        return Type(node.type)
+        
+        #Ensure that type of the initial value matches the declared type.
+        if node.init != None:
+            initial_value_type = self.visit(node.init) 
+            if not type == initial_value_type:
+                raise TargetTypeCheckException(
+                "Incompatable types when assigning to %s (type: %s) from type %s" % 
+                (name, str(type), str(initial_value_type)), node)
+        
+        
+
+    def visit_DeclList(self, node):
+        self.visit_children(node)
     
     def visit_Assignment(self, node):
-        op     = node.op #just a string
-        lvalue = self.visit(node.lvalue)
-        rvalue = self.visit(node.rvalue)
-
+        """Defers to C99 spec as defined in Type"""
         #Typechecking logic handled by the types.
-        return Type.get_op_type(op, (lvalue, rvalue))
+        return Type.get_op_type(node.op, (self.visit(node.lvalue), 
+                                          self.visit(node.rvalue)))
+    
+    def visit_UnaryOp(self, node):
+        """Defers to C99 spec as defined in Type"""
+        return Type.get_op_type(node.op, (self.visit(node.expr), ))
     
     def visit_BinaryOp(self, node):
-        return Type.get_op_type(node.op, (node.left,node.right))
+        """Defers to C99 spec as defined in Type"""
+        return Type.get_op_type(node.op, (self.visit(node.left),
+                                          self.visit(node.right)))
     
     def visit_Break(self):
         pass
         
     def visit_ID(self, node):
-        return self._g.get_variable(node.name).get_type()
+        """Gets the type of an already declared variable.
         
+        Context does exception handling if ID isn't defined.
+        """
+        return self._g.get_variable(node.name).get_type()
+    
+    def visit_Cast(self, node):
+        """Returns the type to which the variable is casted."""
+        return self.visit(node.to_type)
+    
+    def visit_Typename(self, node):
+        return self.visit(node.type)
+    
+    def visit_Constant(self, node):
+        return Type(node.type)
+    
     def visit_TypeDecl(self, node):
-        #                                                                        TODO?
+        #                                                                        TODO quals?
         """Returns the Type for the base type.
         
         I believe that visit_Decl is the only way that visit_TypeDecl is ever
@@ -285,46 +474,46 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 
     def visit_IdentifierType(self, node):
         """Returns a Type for the identifier."""
-        return Type(node.names[0])                                              #TODO?
-        
-        
-        
-    
+        return Type(node.names[0])                                              #TODO quals?
     
     def generic_visit(self, node):
         """Raises an error when no visit_XXX method is defined."""
         raise TargetTypeCheckException("visit_%s undefined" % 
-                                       node.__class__.__name__, ast)
+                                       node.__class__.__name__, node)
     def visit_children(self, node):
         for c_name, c in node.children():
             self.visit(c)
 
-
-#Testing...
-p = OpenCLCParser()
-#ast = p.parse("__kernel int plus(int a, int b) {return plus(a + b, 1);}")
-ast = p.parse("int main() { int x=1; x=1; return 0; }")
-try:
-    tc = OpenCLTypeChecker(Context())
-    tc.visit(ast)
-except TargetTypeCheckException as e:
-    print e.message
-    raise e
-
-#ast.show()
-
-#def type_check_OpenCL(g, ast):
-#    """ Type checks OpenCL code generated by Ace 
-#        g(amma) = current context
-#        ast     = current AST 
-#        Returns a new context. """
-#    if isinstance(ast, pycparser.c_ast.FileAST):
-#        for child in ast.ext:
-#            g = type_check_OpenCL(g, child)
-#    if isinstance(ast, pycparser.c_ast.FuncDef):
-#        pass
-#        #for child in ast.ext:
-#        #    g = type_cehck_OpenCL(g, child)
-#    else:
-#        raise TargetTypeCheckException("Node type is unknown %s" % ast.__class__,
-#                                   ast)
+    def visit_PreprocessorLine(self, node):
+        raise TargetTypeCheckException("Expected preprocessed code "+
+                                       "but found a preprocessor line.", node)
+    
+    def visit_ArrayDecl(self, node):
+        t = self.visit(node.type)
+        dim_t = self.visit(node.dim)
+        
+        if not Type.check_dim_type(dim_t):
+            raise TargetTypeCheckException(
+                            "Expected valid Array dimension type but found %s"%
+                            str(dim_t), node)
+        t.is_array = True
+        t.dim = node.dim
+        return t
+    
+    def visit_ExprList(self, node):
+        #TODO do the right thing.
+        """Returns an Array of the last expr's type. TODO"""
+        t = None #the type
+        for e in node.exprs:
+            if t == None:
+                t = self.visit(e)
+            else:
+                e_t = self.visit(e)
+                if not t == e_t:
+                    raise TargetTypeCheckException(
+                     "Expected all expressions to have type %s, but found %s"%
+                     (str(t), str(e_t)), node)
+        t.is_array = True
+        t.dim = len(node.exprs)
+        return t
+        
