@@ -7,12 +7,17 @@ import cypy
 #                                        TYPES                                 #
 ################################################################################
 class Type:
-    """ An OpenCL Type """
+    """An OpenCL Type."""
     def __init__(self, name):
         self.name = name
 
+    @classmethod
+    def get_op_type(cls, op, values):
+        """Implements all operations, including assignment."""                  #TODO implement
+        return values[0]
+        
     def eq(self, other):
-        """ This is incorrect. TODO. """
+        """This is incorrect. TODO."""                                          #TODO implement according to typechecking rules codified in Ace.
         if not isinstance(other, Type): return False
         return str(self.name) == str(other.name)
     
@@ -22,9 +27,11 @@ class Type:
         return self.eq(other)
 
 class FunctionType(Type):
-    """ A function type in the target language. 
-        The function name is part of the type.
-        Function "Variables" are given the name ![name] in the Context."""
+    """A function type in the target language. 
+
+    The function name is part of the type, and function Variables are given
+    the name variable_name(name) in the Context.
+    """
     
     @classmethod
     def variable_name(cls, name):
@@ -45,7 +52,7 @@ class FunctionType(Type):
 ################################################################################
 
 class Variable(object):
-    """ A variable. """
+    """A variable or function in context."""
     def __init__(self, name):
         self.name = name
         self.scope = list() #stack
@@ -70,8 +77,11 @@ class Variable(object):
             self.type.pop(scope)
     
 class Context(object):
-    """ A context for typechecking C-style programs.
-        The scope is a stack. """
+    """A context for typechecking C-style programs.
+    
+    The primary reason this is C-style is that the scope is a stack, and 
+    functions aren't treated a values. 
+    """
     def __init__(self):
         self.returning  = False   #True iff checker is inside a return stmt
         self.functions  = list()  #stack, determines type of returning func.  
@@ -87,8 +97,10 @@ class Context(object):
                                            % variable_name, None)     
     
     def add_variable(self, variable_name, type, node=None):
-        """ Adds a variable to the current scope.
-            An error is raised if the variable is already defined in scope. """
+        """Adds a variable to the current scope.
+       
+        An error is raised if the variable is already defined in scope.
+        """
         scope = self._scope[-1] #the current scope.
 
         # Ensure that this variable isn't already defined for the current scope.
@@ -105,11 +117,11 @@ class Context(object):
                 self.functions.append(self._variables[variable_name])
 
     def change_scope(self):
-        """ Adds another scope. Everything previously in scope remains so. """
+        """Adds another scope. Everything previously in scope remains so."""
         self._scope.append(0 if len(self._scope) == 0  else self._scope[-1] + 1)
         
     def leave_scope(self):
-        """ Moves down in scope. Removes all variables that go out of scope. """
+        """Moves down in scope. Removes all variables that go out of scope."""
         scope = self._scope[-1] #the current scope.
         for v in self._variables.values():
             if scope in v.scope:
@@ -133,14 +145,16 @@ class TargetTypeCheckException(Exception):
 ################################################################################
         
 class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
-    """ Type checks OpenCL code.
-        To use:
-            tc = OpenCLTypeChecker(context)
-            tc.visit(node) """
+    """Type checks OpenCL code.
+    
+    To use:
+        tc = OpenCLTypeChecker(context)
+        tc.visit(node) 
+    """
     
     def __init__(self, context=Context()):
-        """ context = a pycparserext.typechecker.Context object. """
-        self._g = Context() #To get auto-complete... TODO remove.
+        """context = a pycparserext.typechecker.Context object."""
+        self._g = Context()                                                     #To get auto-complete in my IDE... TODO remove.
         self._g = context
 
     def visit_FileAST(self, node):
@@ -150,7 +164,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 #        self.visit_children(node)
         
     def visit_FuncDef(self, node):
-        """ Function definition. """
+        """Function definition."""
         # Get the function's name and return type.
         function_name = node.decl.name
         return_type   = Type(node.decl.type.type.type.names[0])
@@ -158,9 +172,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         # Get the parameter names and types
         param_names = list()
         param_types = list()
-        for param in node.decl.type.args.params:
-            param_names.append(param.type.declname)
-            param_types.append(Type(param.type.type.names[0]))
+        if not node.decl.type.args == None:
+            for param in node.decl.type.args.params:
+                param_names.append(param.type.declname)
+                param_types.append(Type(param.type.type.names[0]))
         
         # Add the function to the enclosing scope.
         func_t = FunctionType(function_name, param_types, return_type)
@@ -180,12 +195,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         self._g.leave_scope()
     
     def visit_Compound(self, node):
-        """ TODO? """
+        """TODO? """
         self.visit_children(node)
     
     def visit_Return(self, node):
-        """ Checks that the value returned has the same type as the enclosing 
-            function. """
+        """Ensures the returned value's type is the function's return_type."""
         self._g.returning = True
         return_type = self.visit(node.expr)
         self._g.returning = False
@@ -193,8 +207,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         f = self._g.functions[-1].get_type()
         if not return_type == f.return_type:
             raise TargetTypeCheckException(
-                                    "returning from %s expected %s but got %s" %
-                                    (f.name, f.return_type.name, return_type.name), node)
+                        "returning from %s expected %s but got %s" %
+                        (f.name, f.return_type.name, return_type.name), node)
     
     def visit_FuncCall(self, node):
         func_type = self._g.get_variable(
@@ -221,9 +235,64 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         # Return the return type.
         return func_type.return_type 
     
+    def visit_Continue(self, node):
+        pass
+    
+    def visit_Decl(self, node):
+        #                                                                        TODO Implement all the other C99 junk
+        """Adds a declared variable to the context."""
+        name = node.name
+        type = self.visit(node.type)
+        initial_value_type = self.visit(node.init)
+        
+        #Ensure that type of the initial value matches the declared type. 
+        if not type == initial_value_type:
+            raise TargetTypeCheckException(
+            "Incompatable types when assigning to %s (type: %s) from type %s" % 
+            (name, type.name, initial_value_type.name), node)
+        
+        self._g.add_variable(name, type, node)
+    
+    def visit_Constant(self, node):
+        return Type(node.type)
+    
+    def visit_Assignment(self, node):
+        op     = node.op #just a string
+        lvalue = self.visit(node.lvalue)
+        rvalue = self.visit(node.rvalue)
+
+        #Typechecking logic handled by the types.
+        return Type.get_op_type(op, (lvalue, rvalue))
+    
+    def visit_BinaryOp(self, node):
+        return Type.get_op_type(node.op, (node.left,node.right))
+    
+    def visit_Break(self):
+        pass
+        
+    def visit_ID(self, node):
+        return self._g.get_variable(node.name).get_type()
+        
+    def visit_TypeDecl(self, node):
+        #                                                                        TODO?
+        """Returns the Type for the base type.
+        
+        I believe that visit_Decl is the only way that visit_TypeDecl is ever
+        called. If this is not true, then this function should add the variable
+        to the context.
+        """
+        return self.visit(node.type)
+
+    def visit_IdentifierType(self, node):
+        """Returns a Type for the identifier."""
+        return Type(node.names[0])                                              #TODO?
+        
+        
+        
+    
     
     def generic_visit(self, node):
-        """ Raises an error when no visit_XXX method is defined. """
+        """Raises an error when no visit_XXX method is defined."""
         raise TargetTypeCheckException("visit_%s undefined" % 
                                        node.__class__.__name__, ast)
     def visit_children(self, node):
@@ -233,7 +302,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 
 #Testing...
 p = OpenCLCParser()
-ast = p.parse("__kernel int plus(int a, int b) {return plus(a + b, 1);}")
+#ast = p.parse("__kernel int plus(int a, int b) {return plus(a + b, 1);}")
+ast = p.parse("int main() { int x=1; x=1; return 0; }")
 try:
     tc = OpenCLTypeChecker(Context())
     tc.visit(ast)
