@@ -56,17 +56,27 @@ class Type:
     
     @classmethod
     def check_cond_type(cls, type):
+        """Ensures that Type is a valid type for a conditional expression
+        
+        ie, if(expr)... s/t expr:type
+        """
         #TODO types.
         return cls.get_cond_type() == type
     
     @classmethod
     def get_cond_type(cls):
+        #TODO types
         return Type("bool")
     
     @classmethod
     def check_dim_type(cls, type):
         """Ensures Type is a valid expression for an array dimension"""
-        return Type("int") == type
+        return Type("int") == type #TODO types
+
+    @classmethod
+    def check_subscript_type(cls, type):
+        """Ensures Type is a valid expression for an array subscript"""
+        return cls.check_dim_type(type) #TODO types
     
     @classmethod
     def get_op_type(cls, op, values):
@@ -516,4 +526,23 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         t.is_array = True
         t.dim = len(node.exprs)
         return t
+    
+    def visit_ArrayRef(self, node):
+        array_t = self.visit(node.name)
+        
+        if not array_t.is_array:
+            raise TargetTypeCheckException(
+                    "Attempting subscript access on a non-array type %s" %
+                    str(array_t), node) 
+        
+        subscript_t = self.visit(node.subscript)
+        if not Type.check_subscript_type(subscript_t):
+            raise TargetTypeCheckException(
+                                        "Arrays cannot be indexed by type %s" % 
+                                        str(subscript_t), node)
+        
+        return array_t
+        
+        
+        
         

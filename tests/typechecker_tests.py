@@ -37,6 +37,13 @@ typedef struct {
 
 
 ################################################################################
+#Compound Statements
+################################################################################
+
+#TODO visit_Compound needs to manage scope, but that causes issues ATM for some reason.
+
+
+################################################################################
 #Function Definition and Application
 ################################################################################
 
@@ -232,3 +239,27 @@ int main() {
     int x[2] = {1,s};
 }
 """, False)
+
+
+################################################################################
+#Array Reference
+################################################################################
+
+check("""
+int main() {
+    int x[2] = {1,2};
+    return x[0];
+}""")
+
+check("""
+int main() {
+    int y;
+    return y[0];
+}""",False) #y isn't an array
+
+check(stuff + """
+int main() {
+    stuff s;
+    int x[2] = {1,2};
+    return x[s];
+}""",False) #s isn't an index type.
