@@ -7,7 +7,7 @@ from pycparserext.ext_c_generator import OpenCLCGenerator
 #                                        TYPES                                 #
 ################################################################################
 #TODO Make Type abstract and factor out the class methods into something OpenCL specific.
-class Type:
+class Type(object):
     """An OpenCL Type."""
     def __init__(self, name):
         """Initialized a new Type; based on Decl in pycparser/c_ast.cfg
@@ -27,7 +27,27 @@ class Type:
         #Array types
         self.is_array = False
         self.dim      = None
+
+    def enter_scope(self, v, g, scope):
+        """Adds `Variable` v to `Scope` scope in `Context` g
         
+        Types handle scopes in a dispatch-style pattern because the result of 
+        adding a `Variable` to the scope varies depending upon the type of the
+        `Variable`. For example, enum types add some ints to the context, and
+        structs/typedefs add new type keywords."""
+        # Create the variable identifier if it doesn't already exist.
+        if not g._variables.has_key(v.name):
+            g._variables[v.name] = v
+        
+        #Add the variable to the scope.
+        v.add_scope(scope, self)
+    
+    def leave_scope(self, v, g, scope):
+        """Removes `Variable` v from `Scope` scope in `Context` g
+        
+        See enter_scope."""
+        v.remove_scope(scope)
+          
     def __str__(self):
         name = ""
         for q in self.quals:
@@ -40,7 +60,6 @@ class Type:
             name = name + "[%s] " % self.dim
         name = name + "%s" % self.name
         return name
-
 
     def add_qual(self, qual):
         #TODO check
@@ -96,8 +115,41 @@ class Type:
         return self.eq(other)
     def __cmp__(self,other):
         return self.eq(other)
+
+class EnumType(Type):
+    """An enum type."""
+    def __init__(self, name, values):
+        """Constructor.
+        
+        name = name of variable (optional). The Type.name name of all enums is
+        simply enum. the `name` passed into this constructor is only used to 
+        create a variable with the correct name.
+        """
+        super(EnumType,self).__init__("enum")
+        self._enum_name = name
+        self.enum_values = values if not values == None else list()
     
-    
+    @classmethod
+    def enum_value_type(cls):
+        t = Type("int")
+        t.add_qual("const")
+        return t
+
+    @classmethod
+    def enum_name_type(cls):
+        return Type("int")
+        
+    def enter_scope(self, v, g, scope):
+        """All enum values + the name should go in and out of scope together."""
+        #If a name was given to the enum, add a new variable to the scope.
+        if not self.name == None:
+            v.name = self._enum_name #TODO-nf
+            self.enum_name_type().enter_scope(v, g, scope)
+        
+        #Add each of the enum values to the context.
+        for value_name in self.enum_values:            
+            g.add_variable(value_name, self.enum_value_type(), None)
+
 class FunctionType(Type):
     """A function type in the target language. 
 
@@ -118,24 +170,27 @@ class FunctionType(Type):
     def get_variable_name(self):
         return self.variable_name(self.name)
 
+    def enter_scope(self, v, g, scope):
+        if not g._variables.has_key(v.name):
+            g._variables[v.name] = v
+        v.add_scope(scope, self)
+        g.functions.append(v)
+
 
 ################################################################################
-#                                 CONTEXT HANDLING                             #
+#                                 IDENTIFIERS                                  #
 ################################################################################
 
 class Variable(object):
-    """A variable or function in context."""
+    """A variable or function identifier. 
+    
+    Variable has multiple Types because the same identifier can have different
+    types depending on the scope.
+    """
     def __init__(self, name):
         self.name = name
         self.scope = list() #stack
         self.type  = dict() #{scope : type, ...}
-        
-    def add_scope(self, scope, type):
-        if not isinstance(type, Type):
-            raise TargetTypeCheckException(
-             "Expecting an instance of Type but got %s" % type.__class__,None)    
-        self.scope.append(scope)
-        self.type[scope] = type
 
     def get_type(self):
         return self.type.get(self.scope[-1])
@@ -143,12 +198,24 @@ class Variable(object):
     def get_type_at_scope(self, scope):
         return self.type[scope]
 
+    def add_scope(self, scope, type):
+        if not isinstance(type, Type):
+            raise TargetTypeCheckException(
+             "Expecting an instance of Type but got %s" % type.__class__,None)    
+        self.scope.append(scope)
+        self.type[scope] = type
+        
     def remove_scope(self, scope):
         if self.scope.count(scope) > 0:
             self.scope.remove(scope)
         if self.type.has_key(scope):
             self.type.pop(scope)
-    
+
+
+################################################################################
+#                                 CONEXT                                       #
+################################################################################
+
 class Context(object):
     """A context for typechecking C-style programs.
     
@@ -173,24 +240,24 @@ class Context(object):
                                            % variable_name, None)     
     
     def add_variable(self, variable_name, type, node=None):
-        """Adds a variable to the current scope.
-       
-        An error is raised if the variable is already defined in scope.
-        """
+        """Adds a variable to the current scope."""
+        if not isinstance(type, Type):
+            raise TargetTypeCheckException(
+                                        "Expected subclass of Type but got %s"%
+                                        str(type), node)
+        
         scope = self._scope[-1] #the current scope.
 
         # Ensure that this variable isn't already defined for the current scope.
         if self._variables.has_key(variable_name) and \
-           self._variables[variable_name].scope.has_key(scope):
-            raise TargetTypeCheckException("Cannot define variable %s " +
-                            "twice in the same context" % variable_name, node)
+           self._variables[variable_name].scope.count(scope) > 0:
+            raise TargetTypeCheckException("Cannot redeclare %s"%variable_name + 
+                " (%s) as a different symbol (%s)" % 
+                (self._variables[variable_name].get_type_at_scope(scope), type),
+                node)
         
-        # Add the variable to this scope.
-        if not self._variables.has_key(variable_name):
-            self._variables[variable_name] = Variable(variable_name)
-            self._variables[variable_name].add_scope(scope,type)
-            if isinstance(type, FunctionType):
-                self.functions.append(self._variables[variable_name])
+        # Add the identifier to the scope.
+        type.enter_scope(Variable(variable_name),self,scope)
 
     def change_scope(self):
         """Adds another scope. Everything previously in scope remains so."""
@@ -201,9 +268,10 @@ class Context(object):
         scope = self._scope[-1] #the current scope.
         for v in self._variables.values():
             if scope in v.scope:
-                v.remove_scope(scope)
-            if len(v.scope) == 0:
-                self._variables.pop(v.name)
+                v.get_type_at_scope(scope).leave_scope(v,self,scope)
+        #Remove out-of-scope identifiers from identifier list.
+        for v in self._variables.values():
+            if len(v.scope) == 0: self._variables.pop(v.name)
 
 
 ################################################################################
@@ -232,6 +300,14 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         """context = a pycparserext.typechecker.Context object."""
         self._g = Context()                                                     #To get auto-complete in my IDE... TODO remove.
         self._g = context
+        
+    def generic_visit(self, node):
+        """Raises an error when no visit_XXX method is defined."""
+        raise TargetTypeCheckException("visit_%s undefined" % 
+                                       node.__class__.__name__, node)
+    def visit_children(self, node):
+        for c_name, c in node.children():
+            self.visit(c)
 
     def visit_FileAST(self, node):
         self.visit_children(node)
@@ -485,14 +561,6 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_IdentifierType(self, node):
         """Returns a Type for the identifier."""
         return Type(node.names[0])                                              #TODO quals?
-    
-    def generic_visit(self, node):
-        """Raises an error when no visit_XXX method is defined."""
-        raise TargetTypeCheckException("visit_%s undefined" % 
-                                       node.__class__.__name__, node)
-    def visit_children(self, node):
-        for c_name, c in node.children():
-            self.visit(c)
 
     def visit_PreprocessorLine(self, node):
         raise TargetTypeCheckException("Expected preprocessed code "+
@@ -542,7 +610,22 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                                         str(subscript_t), node)
         
         return array_t
+    
+    def visit_EmptyStatement(self, node):
+        pass
+    
+    def visit_Enum(self, node):
+        enum = EnumType(node.name,list())
         
+        for e in node.values.enumerators:
+            if not e.value == None:
+                v_type = self.visit(e.value)
+                if not v_type == EnumType.enum_value_type():
+                    raise TargetTypeCheckException(
+                            "Expected enum value to be type %s but found %s" %
+                            (EnumType.enum_value_type(), v_type), node)
+            enum.enum_values.append(e.name)
         
-        
-        
+        return enum
+            
+    

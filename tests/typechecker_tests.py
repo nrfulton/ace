@@ -1,5 +1,6 @@
 import pycparser
 import pycparserext.typechecker.type_checker as checker
+from pycparserext.typechecker.type_checker import Context
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
 import traceback
@@ -8,7 +9,8 @@ OCL_PARSER = OpenCLCParser() #The constructor does some heavy lifting.
 def check(code, expect_success=True, show_trace=False, show_ast=False):
     """The template for all tests in this file."""
     ast = OCL_PARSER.parse(code)
-    tc = checker.OpenCLTypeChecker(checker.Context())
+    g = Context()
+    tc = checker.OpenCLTypeChecker(g) #create checker w/ new ctx
     try:
         tc.visit(ast)
         assert expect_success #false positives
@@ -263,3 +265,44 @@ int main() {
     int x[2] = {1,2};
     return x[s];
 }""",False) #s isn't an index type.
+
+
+################################################################################
+#Empty Statement
+################################################################################
+
+check("""int main() {int x; ; return 0; }""")
+
+
+################################################################################
+#Enum
+################################################################################
+
+check("""
+int main() {
+    enum {zero,one,two,four=4};
+}
+int zero;
+""")
+
+check("""
+int main() {
+    enum seq {zero,one,two,four=4};
+    seq = zero;
+    seq = four;
+}
+""")
+
+check("""
+int main() {
+    enum seq {zero,one,two,four=4};
+    int zero;
+}
+""", False) #redeclaration of zero.
+
+check("""
+int main() {
+    enum seq {zero,one,two,four=4};
+    int seq;
+}
+""", False) #redeclaration of seq.
