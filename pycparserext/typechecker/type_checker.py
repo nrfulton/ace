@@ -4,9 +4,85 @@ from pycparserext.ext_c_generator import OpenCLCGenerator
 #import cypy
 
 ################################################################################
+#                      TYPING CHECKING RULES                                   #
+################################################################################
+class TypeDefinitions(object):
+    def __init__(self):       
+        """Todo populate from OCL spec""" 
+        #built-in types
+        self.types = list()
+        self.types.append("int")
+        self.types.append("char")
+        
+        self.tags = dict() #tagname -> Type
+        
+        #qualifiers
+        self.quals = list()
+        self.quals.append("const")
+        
+        #storage specifiers
+        self.storage = list()
+        
+        #function specifiers
+        self.funcspec = list()
+    
+    def cond_type(self):
+        """ Expected type of a conditional. 
+        
+        To check if conditional term with type cond_type is correct, use 
+        if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
+            raise...
+        """
+        return Type("bool")
+    
+    def dim_type(self):
+        """Expected type of a dimension for an array.
+        
+        To check if a dimension is correct use this functio nas one of the args
+        to `equal`.
+        """
+        return Type("int")
+    
+    def switch_type(self):
+        """Type of switch statements."""
+        return None #The full switch statement shouldn't resolve to a type.
+    
+    def subs_type(self):
+        return self.dim_type()
+    
+    def exists(self, type):
+        """Raises an exception if type doesn't exist. Returns true."""
+        if not type.name in self.types:
+            raise TargetTypeCheckException("Typename %s unknown"%type.name,node)
+        for q in type.quals:
+            if not q in self.quals:
+                raise TargetTypeCheckException("Qualifier %s unknown"%q,node)
+        for fs in type.funcspec:
+            if not fs in self.funcspec:
+                raise TargetTypeCheckException(
+                                   "Function Specifier %s unknown"%fs,node)
+        for s in type.storage:
+            if not s in self.storage:
+                raise TargetTypeCheckException(
+                                    "Storage specifier %s unknown"%s,node)
+        return True
+    
+    def return_type(self, op, lhs, rhs=None):
+        """Typechecks and resolves types for ops, including assignment."""
+        if(op == "=="):
+            return self.cond_type()
+        return lhs
+    
+    def sub(self, lhs, rhs):
+        """Returns true if lhs and be used where rhs is expected per c99."""
+        if not isinstance(lhs, Type): return False
+        if not isinstance(rhs, Type): return False
+        return lhs.name == rhs.name
+
+################################################################################
 #                                        TYPES                                 #
 ################################################################################
-#TODO Make Type abstract and factor out the class methods into something OpenCL specific.
+
 class Type(object):
     """An OpenCL Type."""
     def __init__(self, name):
@@ -62,60 +138,27 @@ class Type(object):
         return name
 
     def add_qual(self, qual):
-        #TODO check
         self.quals.append(qual)
     
     def add_storage_spec(self, s):
-        #TODO check
         self.storage.append(s)
     
     def set_bitsize(self, bitsize):
-        #TODO check
         self.bitsize = bitsize
-    
-    @classmethod
-    def check_cond_type(cls, type):
-        """Ensures that Type is a valid type for a conditional expression
+
+class TypeDef(Type):
+    """A typedef."""
+    def __init__(self, typename, type):
+        """Constructor.
         
-        ie, if(expr)... s/t expr:type
+        typename = the name of this type
+        type     = `Type` represented by typename
         """
-        #TODO types.
-        return cls.get_cond_type() == type
+        super(TypeDef, self).__init__(type.name)
+        self.typename = name
+        self.type     = type
     
-    @classmethod
-    def get_cond_type(cls):
-        #TODO types
-        return Type("bool")
     
-    @classmethod
-    def check_dim_type(cls, type):
-        """Ensures Type is a valid expression for an array dimension"""
-        return Type("int") == type #TODO types
-
-    @classmethod
-    def check_subscript_type(cls, type):
-        """Ensures Type is a valid expression for an array subscript"""
-        return cls.check_dim_type(type) #TODO types
-    
-    @classmethod
-    def get_op_type(cls, op, values):
-        """Typechecks and resolves types for ops, including assignment."""
-        #TODO types.
-        if(op == "=="):
-            return cls.get_cond_type()
-        return values[0]
-
-    def eq(self, other):
-        """This is incorrect. TODO."""
-        #TODO types. implement according to typechecking rules codified in Ace.
-        if not isinstance(other, Type): return False
-        return str(self.name) == str(other.name)
-    
-    def __eq__(self, other):
-        return self.eq(other)
-    def __cmp__(self,other):
-        return self.eq(other)
-
 class EnumType(Type):
     """An enum type."""
     def __init__(self, name, values):
@@ -229,6 +272,9 @@ class Context(object):
         self._scope      = list()  #stack.
         self._scope.append(0)
         
+        #Type definitions for thie context (typenames, etc.)
+        self.type_defs = TypeDefinitions()
+        
         #Context variables specific to a statement's form.
         self.switch_type = Type(None) #Type of switch condition.
     
@@ -318,7 +364,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_DoWhile(self, node):
         """Ensures conditional has correct type and statement is well-typed."""
         cond_type = self.visit(node.cond)
-        if not Type.check_cond_type(cond_type):
+        if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                         "Expected condition (%s or similar) but found %s" %
                         (str(Type.get_cond_type()), str(cond_type)), node)
@@ -335,10 +381,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         self.visit(node.init)
                 
         cond_type = self.visit(node.cond)
-        if not Type.check_cond_type(cond_type):
+        if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                         "Expected condition of for to be %s but found %s" %
-                        (str(Type.get_cond_type()), str(cond_type)), node)
+                        (str(self._g.type_defs.cond_type()), 
+                         str(cond_type)), node)
         
         self.visit(node.next)
         self.visit(node.stmt)
@@ -354,14 +401,14 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_TernaryOp(self, node):
         """Ensures conditional is correct type and expression types match."""
         cond_type = self.visit(node.cond)
-        if not Type.check_cond_type(cond_type):
+        if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                         "Expected condition of ternary to be %s but found %s" %
                         (str(Type.get_cond_type()), str(cond_type)), node)
         
         t_t = self.visit(node.iftrue)
         f_t = self.visit(node.iffalse)
-        if not t_t == f_t:
+        if not self._g.type_defs.sub(t_t,f_t):
             raise TargetTypeCheckException(
                         "Ternary condition expressions %s and %s don't match" %
                         (str(t_t), str(f_t)), node)
@@ -383,7 +430,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     
     def visit_Case(self, node):
         label_t = self.visit(node.expr)
-        if not self._g.switch_type == label_t:
+        if not self._g.type_defs.sub(label_t,self._g.type_defs.switch_type()):
             raise TargetTypeCheckException(
                                 "Case label of type %s does not reduce to %s"%
                                 (str(label_t), str(self._g.switch_type)), node) 
@@ -392,7 +439,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     
     def visit_If(self, node):
         cond_type = self.visit(node.cond)
-        if not Type.check_cond_type(cond_type):
+        if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                 "Expected conditional type for if condition but found %s"% 
                 cond_type, node)
@@ -447,7 +494,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         self._g.returning = False
         
         f = self._g.functions[-1].get_type()
-        if not return_type == f.return_type:
+        if not self._g.type_defs.sub(return_type,f.return_type):
             raise TargetTypeCheckException(
                         "returning from %s expected %s but got %s" %
                         (str(f), str(f.return_type), str(return_type)), node)
@@ -470,7 +517,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         # Ensure that parameter types match declared parameter types.
         for p,ep in zip(param_types, func_type.param_types):
-            if not p == ep:
+            if not self._g.type_defs.sub(p, ep):
                 raise TargetTypeCheckException(
                         "Arguments to %s are incorrect: expected %s but got %s"%
                         (str(func_type),p,ep), node)
@@ -503,7 +550,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         #Ensure that type of the initial value matches the declared type.
         if node.init != None:
             initial_value_type = self.visit(node.init) 
-            if not type == initial_value_type:
+            if not self._g.type_defs.sub(type , initial_value_type):
                 raise TargetTypeCheckException(
                 "Incompatable types when assigning to %s (type: %s) from type %s" % 
                 (name, str(type), str(initial_value_type)), node)
@@ -516,17 +563,18 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_Assignment(self, node):
         """Defers to C99 spec as defined in Type"""
         #Typechecking logic handled by the types.
-        return Type.get_op_type(node.op, (self.visit(node.lvalue), 
-                                          self.visit(node.rvalue)))
+        return self._g.type_defs.return_type(node.op, 
+                                             self.visit(node.lvalue), 
+                                             self.visit(node.rvalue))
     
     def visit_UnaryOp(self, node):
         """Defers to C99 spec as defined in Type"""
-        return Type.get_op_type(node.op, (self.visit(node.expr), ))
+        return self._g.type_defs.return_type(node.op,self.visit(node.expr))
     
     def visit_BinaryOp(self, node):
         """Defers to C99 spec as defined in Type"""
-        return Type.get_op_type(node.op, (self.visit(node.left),
-                                          self.visit(node.right)))
+        return self._g.type_defs.return_type(node.op,self.visit(node.left),
+                                          self.visit(node.right))
     
     def visit_Break(self):
         pass
@@ -556,7 +604,14 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         called. If this is not true, then this function should add the variable
         to the context.
         """
-        return self.visit(node.type)
+        t = self.visit(node.type)
+        if not node.quals == None:
+            for q in node.quals:
+                t.add_qual(q)
+        
+        
+        
+        return t
 
     def visit_IdentifierType(self, node):
         """Returns a Type for the identifier."""
@@ -570,7 +625,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         t = self.visit(node.type)
         dim_t = self.visit(node.dim)
         
-        if not Type.check_dim_type(dim_t):
+        if not self._g.type_defs.sub(dim_t, self._g.type_defs.dim_type()):
             raise TargetTypeCheckException(
                             "Expected valid Array dimension type but found %s"%
                             str(dim_t), node)
@@ -587,7 +642,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                 t = self.visit(e)
             else:
                 e_t = self.visit(e)
-                if not t == e_t:
+                if not self._g.type_defs.sub(t, e_t):
                     raise TargetTypeCheckException(
                      "Expected all expressions to have type %s, but found %s"%
                      (str(t), str(e_t)), node)
@@ -604,7 +659,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                     str(array_t), node) 
         
         subscript_t = self.visit(node.subscript)
-        if not Type.check_subscript_type(subscript_t):
+        if not self._g.type_defs.sub(subscript_t,self._g.type_defs.subs_type()):
             raise TargetTypeCheckException(
                                         "Arrays cannot be indexed by type %s" % 
                                         str(subscript_t), node)
@@ -620,12 +675,20 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         for e in node.values.enumerators:
             if not e.value == None:
                 v_type = self.visit(e.value)
-                if not v_type == EnumType.enum_value_type():
+                if not self._g.type_defs.sub(v_type,EnumType.enum_value_type()):
                     raise TargetTypeCheckException(
                             "Expected enum value to be type %s but found %s" %
                             (EnumType.enum_value_type(), v_type), node)
             enum.enum_values.append(e.name)
         
         return enum
-            
     
+    def visit_Enumerator(self, node):
+        raise TargetTypeCheckException("Sould be handled by visit_Enum.",node)
+
+    def visit_EnumeratorList(self, node):
+        raise TargetTypeCheckException("Sould be handled by visit_Enum.",node)
+
+#    def visit_Typedef(self, node):
+#        node.show()
+        

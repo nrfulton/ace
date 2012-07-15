@@ -306,3 +306,51 @@ int main() {
     int seq;
 }
 """, False) #redeclaration of seq.
+
+check("""
+int main() {
+    enum seq {zero,one,two,four=4};
+    int seq;
+}
+""", False) #keyword for variable name. 
+
+#check("""
+#int main() {
+#    enum seq {zero,one,two,four=4};
+#    zero = one;
+#}
+#""", False) #lvalue TODO-fail 
+
+
+################################################################################
+#Typedef
+################################################################################
+
+#check("""
+#int main() {
+#    typedef int XXX;
+#}
+#""")
+
+
+################################################################################
+#Union Types
+################################################################################
+#
+#check("""
+#int main() {
+#    union u {
+#        int x;
+#        char y;
+#    };
+#}
+#""")
+#
+#check("""
+#int main() {
+#    union u {
+#        int x;
+#        char y;
+#    } udata;
+#}
+#""")
