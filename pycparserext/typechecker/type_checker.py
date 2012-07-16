@@ -13,6 +13,7 @@ class TypeDefinitions(object):
         self.types = list()
         self.types.append("int")
         self.types.append("char")
+        self.types.append("void")
         
         self.tags = dict() #tagname -> Type
         
@@ -51,21 +52,8 @@ class TypeDefinitions(object):
         return self.dim_type()
     
     def exists(self, type):
-        """Raises an exception if type doesn't exist. Returns true."""
-        if not type.name in self.types:
-            raise TargetTypeCheckException("Typename %s unknown"%type.name,node)
-        for q in type.quals:
-            if not q in self.quals:
-                raise TargetTypeCheckException("Qualifier %s unknown"%q,node)
-        for fs in type.funcspec:
-            if not fs in self.funcspec:
-                raise TargetTypeCheckException(
-                                   "Function Specifier %s unknown"%fs,node)
-        for s in type.storage:
-            if not s in self.storage:
-                raise TargetTypeCheckException(
-                                    "Storage specifier %s unknown"%s,node)
-        return True
+        """Raises an exception only if the type is invalid according to c99"""
+        type.exists(self)
     
     def return_type(self, op, lhs, rhs=None):
         """Typechecks and resolves types for ops, including assignment."""
@@ -111,6 +99,9 @@ class Type(object):
         adding a `Variable` to the scope varies depending upon the type of the
         `Variable`. For example, enum types add some ints to the context, and
         structs/typedefs add new type keywords."""
+        #ensure that this type exists.
+        g.type_defs.exists(self)
+        
         # Create the variable identifier if it doesn't already exist.
         if not g._variables.has_key(v.name):
             g._variables[v.name] = v
@@ -145,20 +136,42 @@ class Type(object):
     
     def set_bitsize(self, bitsize):
         self.bitsize = bitsize
+    
+    def exists(self, type_defs):
+        if not self.name in type_defs.types:
+            raise TargetTypeCheckException("Typename %s unknown"%self.name,None)
+        for q in self.quals:
+            if not q in type_defs.quals:
+                raise TargetTypeCheckException("Qualifier %s unknown"%q,None)
+        for fs in self.funcspec:
+            if not fs in type_defs.funcspec:
+                raise TargetTypeCheckException(
+                                   "Function Specifier %s unknown"%fs,None)
+        for s in self.storage:
+            if not s in type_defs.storage:
+                raise TargetTypeCheckException(
+                                    "Storage specifier %s unknown"%s,None)
+        return True
 
 class TypeDef(Type):
     """A typedef."""
-    def __init__(self, typename, type):
+    def __init__(self, tagname, type):
         """Constructor.
         
         typename = the name of this type
         type     = `Type` represented by typename
         """
-        super(TypeDef, self).__init__(type.name)
-        self.typename = name
+        super(TypeDef, self).__init__(tagname)
+        self.tagname = tagname
         self.type     = type
     
+    def enter_scope(self, v, g, scope):
+        g.type_defs.exists(self.type)
+        g.type_defs.tags[self.tagname] = self.type
     
+    def leave_scope(self, v, g, scope):
+        g.type_defs.pop(self.tagname)
+        
 class EnumType(Type):
     """An enum type."""
     def __init__(self, name, values):
@@ -184,6 +197,8 @@ class EnumType(Type):
         
     def enter_scope(self, v, g, scope):
         """All enum values + the name should go in and out of scope together."""
+        g.type_defs.exists(self)
+        
         #If a name was given to the enum, add a new variable to the scope.
         if not self.name == None:
             v.name = self._enum_name #TODO-nf
@@ -214,10 +229,21 @@ class FunctionType(Type):
         return self.variable_name(self.name)
 
     def enter_scope(self, v, g, scope):
+        g.type_defs.exists(self)
         if not g._variables.has_key(v.name):
             g._variables[v.name] = v
         v.add_scope(scope, self)
         g.functions.append(v)
+    
+    def exists(self, type_defs):
+        for pt in self.param_types:
+            if isinstance(pt, FunctionType):
+                raise TargetTypeCheckException("HOFs not support by C")
+            type_defs.exists(pt)
+        if isinstance(self.return_type, FunctionType):
+            raise TargetTypeCheckException("HOFs not support by C")
+        type_defs.exists(self.return_type)
+        return True
 
 
 ################################################################################
@@ -367,7 +393,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                         "Expected condition (%s or similar) but found %s" %
-                        (str(Type.get_cond_type()), str(cond_type)), node)
+                        (str(self._g.type_defs.cond_type()), str(cond_type)), 
+                        node)
         self._g.change_scope()
         self.visit(node.stmt)
         self._g.leave_scope()
@@ -404,7 +431,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         if not self._g.type_defs.sub(cond_type,self._g.type_defs.cond_type()):
             raise TargetTypeCheckException(
                         "Expected condition of ternary to be %s but found %s" %
-                        (str(Type.get_cond_type()), str(cond_type)), node)
+                        (str(self._g.type_defs.cond_type()), str(cond_type)), 
+                        node)
         
         t_t = self.visit(node.iftrue)
         f_t = self.visit(node.iffalse)
@@ -689,6 +717,12 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_EnumeratorList(self, node):
         raise TargetTypeCheckException("Sould be handled by visit_Enum.",node)
 
-#    def visit_Typedef(self, node):
-#        node.show()
+    def visit_Typedef(self, node):
+        t = self.visit(node.type)
+        for q in node.quals:
+            t.add_qual(q)
+        for s in node.storage:
+            t.add_storage_spec(s)
+        
+        return TypeDef(node.name, t)
         
