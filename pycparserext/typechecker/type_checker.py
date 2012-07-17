@@ -30,6 +30,7 @@ class TypeDefinitions(object):
         
         #storage specifiers
         self.storage = list()
+        self.storage.append("typedef") #http://msdn.microsoft.com/en-us/library/w9hwbe3d.aspx
         
         #function specifiers
         self.funcspec = list()
@@ -86,6 +87,11 @@ class TypeDefinitions(object):
         """Typechecks and resolves types for ops, including assignment."""
         if(op == "=="):
             return self.cond_type()
+        if(op == "="):
+            if rhs == None:
+                raise TargetTypeCheckException("= is binary but only one argument given",None)
+            if not self.sub(lhs,rhs):
+                raise TargetTypeCheckException("lhs and rhs of = should have the same type.",None)
         return lhs
     
     def sub(self, lhs, rhs):
@@ -131,6 +137,9 @@ class Type(object):
         #Array types
         self.is_array = False
         self.dim      = None
+        
+        #Ptr types
+        self.is_ptr   = False
 
     def enter_scope(self, v, g, scope):
         """Adds `Variable` v to `Scope` scope in `Context` g
@@ -194,6 +203,28 @@ class Type(object):
                                     "Storage specifier %s unknown"%s,None)
         return True
 
+class StructType(Type):
+    """A struct"""
+    def __init__(self, name, members):
+        super(StructType, self).__init__(name)
+        self.name    = name
+        self.members = members
+    
+    def has_member(self, name):
+        for n in self.members.keys():
+            if n == name: return True
+        return False
+    
+    def get_type(self, name):
+        for n in self.members.keys():
+            if n == name: return self.members[n]
+        raise TargetTypeCheckException("Struct member %s not found"%name,None)
+
+    def exists(self, type_defs):
+        #Ensure that all member types are valid types.
+        for m_type in self.members.values():
+            m_type.exists(type_defs)
+
 class TypeDef(Type):
     """A typedef."""
     def __init__(self, tagname, type):
@@ -208,7 +239,8 @@ class TypeDef(Type):
     
     def enter_scope(self, v, g, scope):
         g.add_typename(self.tagname,scope)
-    
+        super(TypeDef,self).enter_scope(v,g,scope)
+
     def leave_scope(self, v, g, scope):
         pass
         
@@ -300,11 +332,18 @@ class Variable(object):
         self.scope = list() #stack
         self.type  = dict() #{scope : type, ...}
 
+
+    def _return_type(self, type):
+        if isinstance(type, TypeDef):
+            return type.type
+        else:
+            return type
+
     def get_type(self):
-        return self.type.get(self.scope[-1])
+        return self._return_type(self.type.get(self.scope[-1]))
     
     def get_type_at_scope(self, scope):
-        return self.type[scope]
+        return self._return_type( self.type[scope] )
 
     def add_scope(self, scope, type):
         if not isinstance(type, Type):
@@ -350,7 +389,16 @@ class Context(object):
         #Context variables specific to a statement's form.
         self.switch_type = Type(None) #Type of switch condition.
     
+    def is_typename(self,name):
+        for t in self.typenames:
+            if t.name == name: return True
+        return False
+    
+    def get_typename_type(self, name):
+        return self.get_variable(name).get_type()
+            
     def add_typename(self, name, scope):
+        #TODO check to make sure it's not a reserved name
         for t in self.typenames:
             if t.name == name:
                 t.scope.append(scope)
@@ -696,6 +744,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         """
         return self._g.get_variable(node.name).get_type()
     
+    def get_ID(self, node):
+        """Returns the name of the ID instead of its type."""
+        return node.name
+    
     def visit_Cast(self, node):
         """Returns the type to which the variable is casted."""
         return self.visit(node.to_type)
@@ -729,8 +781,12 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         return t
 
     def visit_IdentifierType(self, node):
-        """Returns a Type for the identifier."""
-        return Type(node.names[0])                                              #TODO quals?
+        """Returns a Type for the identifier.""" #TODO Quals?
+        name = node.names[0]
+        if self._g.is_typename(name):
+            return self._g.get_typename_type(name)
+        else:
+            return Type(node.names[0])
 
     def visit_PreprocessorLine(self, node):
         raise TargetTypeCheckException("Expected preprocessed code "+
@@ -811,7 +867,46 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         for s in node.storage:
             t.add_storage_spec(s)
         
-        t = TypeDef(node.name, t)
-        self._g.add_variable(node.name, t, node)
+        type = TypeDef(node.name, t)
+        self._g.add_variable(node.name, type, node)
+        return type
+
+    def visit_Struct(self, node):
+        #Capture declarations in a new context
+        old_g = self._g
+        self._g = Context()
+        for m in node.decls:
+            self.visit(m)
+        
+        #Get the types and names of attributes
+        members = dict()
+        for v in self._g._variables.keys():
+            members[v] = self._g.get_variable(v).get_type()
+        
+        #change to original context and create the struct type
+        self._g = old_g
+        t = StructType(node.name, members)
         return t
     
+    def visit_StructRef(self, node):
+        name = self.get_ID(node.name)
+        struct = self._g.get_variable(name)
+        struct_t = self._g.get_variable(name).get_type() 
+        
+        if not isinstance(struct_t, StructType):
+            raise TargetTypeCheckException("Excpected struct type but found %s"
+                                           % str(struct.get_type()), node)
+        
+        #Ensure correct type argument is used
+        if (struct_t.is_ptr and node.type == ".") \
+        or (not struct_t.is_ptr and node.type == "->"):
+            raise TargetTypeCheckException(
+                                    "Invalid type argument of '%s' (have '%s')"%
+                                           (node.type,str(struct_t)), node)
+        
+        return struct.get_type().get_type(self.get_ID(node.field))
+        
+            
+        
+        
+        
