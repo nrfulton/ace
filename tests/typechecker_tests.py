@@ -91,6 +91,13 @@ int main(int x) { return x; }
 int other() { int x; int y; return main(y); }
 """)
 
+check("""
+int main() {
+    int main;
+    main();
+}
+""",False)#redeclaring main as a non-function.
+
 ################################################################################
 #Conditionals (if, switch, ternary)
 ################################################################################
@@ -329,6 +336,7 @@ int main() {
 check("""
 int main() {
     typedef int XXX;
+    XXX a;
 }
 """)
 

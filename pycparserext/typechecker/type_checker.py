@@ -7,15 +7,22 @@ from pycparserext.ext_c_generator import OpenCLCGenerator
 #                      TYPING CHECKING RULES                                   #
 ################################################################################
 class TypeDefinitions(object):
-    def __init__(self):       
+    """ Part of the context that enforces C99.
+    
+    We build up types and then call `exists` just before introducing
+    a variable in to the context in order to ensure that the variable's type is
+    valid C99.
+    """ 
+    def __init__(self, context):       
         """Todo populate from OCL spec""" 
+        #The context
+        self._g = context
+        
         #built-in types
         self.types = list()
         self.types.append("int")
         self.types.append("char")
         self.types.append("void")
-        
-        self.tags = dict() #tagname -> Type
         
         #qualifiers
         self.quals = list()
@@ -26,6 +33,21 @@ class TypeDefinitions(object):
         
         #function specifiers
         self.funcspec = list()
+    
+    def typename_exists(self, name):
+        if name in self.types:
+            return True
+        for n in self._g.typenames:
+            if name == n.name: return True
+        return False
+           
+    def is_valid_name(self, name):
+        if name == None:
+            return True
+        
+        if name[0] == "!":
+            return False
+        return True
     
     def cond_type(self):
         """ Expected type of a conditional. 
@@ -49,10 +71,15 @@ class TypeDefinitions(object):
         return None #The full switch statement shouldn't resolve to a type.
     
     def subs_type(self):
+        """Subscript type."""
         return self.dim_type()
     
     def exists(self, type):
-        """Raises an exception only if the type is invalid according to c99"""
+        """Raises an exception only if the type is invalid according to c99
+        
+        Each type is responsible  for implementing exists in terms of 
+        the current definition.
+        """
         type.exists(self)
     
     def return_type(self, op, lhs, rhs=None):
@@ -63,9 +90,22 @@ class TypeDefinitions(object):
     
     def sub(self, lhs, rhs):
         """Returns true if lhs and be used where rhs is expected per c99."""
+        #TODO take into account typenames.
         if not isinstance(lhs, Type): return False
         if not isinstance(rhs, Type): return False
         return lhs.name == rhs.name
+    
+    def reserved(self):
+        """Words that cannot be used as variable names."""
+        reserved_words = list()
+        for w in self.types: reserved_words.append(w)
+        for w in self.quals: reserved_words.append(w)
+        for w in self.funcspec: reserved_words.append(w)
+        
+        #for w in self._g.typenames: reserved_words.append(w)
+        #include names of other types.
+        return reserved_words
+        
 
 ################################################################################
 #                                        TYPES                                 #
@@ -138,7 +178,8 @@ class Type(object):
         self.bitsize = bitsize
     
     def exists(self, type_defs):
-        if not self.name in type_defs.types:
+        """See `TypeDefinitions.exist`"""
+        if not type_defs.typename_exists(self.name):
             raise TargetTypeCheckException("Typename %s unknown"%self.name,None)
         for q in self.quals:
             if not q in type_defs.quals:
@@ -166,11 +207,10 @@ class TypeDef(Type):
         self.type     = type
     
     def enter_scope(self, v, g, scope):
-        g.type_defs.exists(self.type)
-        g.type_defs.tags[self.tagname] = self.type
+        g.add_typename(self.tagname,scope)
     
     def leave_scope(self, v, g, scope):
-        g.type_defs.pop(self.tagname)
+        pass
         
 class EnumType(Type):
     """An enum type."""
@@ -199,34 +239,33 @@ class EnumType(Type):
         """All enum values + the name should go in and out of scope together."""
         g.type_defs.exists(self)
         
-        #If a name was given to the enum, add a new variable to the scope.
-        if not self.name == None:
-            v.name = self._enum_name #TODO-nf
-            self.enum_name_type().enter_scope(v, g, scope)
+        #If a name was given to the enum, add a new typename to the scope.
+        if not self._enum_name == None:
+            g.add_variable(self._enum_name, self.enum_name_type(), scope)
         
         #Add each of the enum values to the context.
         for value_name in self.enum_values:            
-            g.add_variable(value_name, self.enum_value_type(), None)
+            g.add_variable(value_name, self.enum_value_type(), scope)
+    
+    def leave_scope(self,v,g,scope):
+        v.remove_scope(scope)
+        
+    def exists(self, type_defs):
+        for v in self.enum_values:
+            if v in type_defs.reserved():
+                raise TargetTypeCheckException("Reserved word in enum def",None)
+        if self._enum_name in type_defs.reserved():
+            raise TargetTypeCheckException("enum name with reserved word",None)
+        return True
 
 class FunctionType(Type):
-    """A function type in the target language. 
-
-    The function name is part of the type, and function Variables are given
-    the name variable_name(name) in the Context.
-    """
-    
-    @classmethod
-    def variable_name(cls, name):
-        return "!%s" % name 
+    """A function type in the target language. """
     
     def __init__(self, name, param_types=list(),
                  return_type=Type("void")):
         self.name          = name # Part of the type because functions aren't values.
         self.param_types   = param_types
         self.return_type    = return_type 
-    
-    def get_variable_name(self):
-        return self.variable_name(self.name)
 
     def enter_scope(self, v, g, scope):
         g.type_defs.exists(self)
@@ -251,7 +290,7 @@ class FunctionType(Type):
 ################################################################################
 
 class Variable(object):
-    """A variable or function identifier. 
+    """A Variable is an Identifier and a scope. 
     
     Variable has multiple Types because the same identifier can have different
     types depending on the scope.
@@ -285,6 +324,11 @@ class Variable(object):
 #                                 CONEXT                                       #
 ################################################################################
 
+class TypeName(object):
+    def __init__(self, name):
+        self.name = name
+        self.scope = list()
+        
 class Context(object):
     """A context for typechecking C-style programs.
     
@@ -293,18 +337,31 @@ class Context(object):
     """
     def __init__(self):
         self.returning   = False   #True iff checker is inside a return stmt
-        self.functions   = list()  #stack, determines type of returning func.  
-        self._variables  = dict()  #name -> Variable
+        self.functions   = list()  #stack, determines type of returning func.
+        self._variables  = dict()  #name -> `Variable`  
         self._scope      = list()  #stack.
         self._scope.append(0)
         
-        #Type definitions for thie context (typenames, etc.)
-        self.type_defs = TypeDefinitions()
+        self.typenames = list()  #of TypeNames
+        
+        #Type definitions for the context.
+        self.type_defs = TypeDefinitions(self)
         
         #Context variables specific to a statement's form.
         self.switch_type = Type(None) #Type of switch condition.
     
+    def add_typename(self, name, scope):
+        for t in self.typenames:
+            if t.name == name:
+                t.scope.append(scope)
+                return True
+        t = TypeName(name)
+        t.scope.append(scope)
+        self.typenames.append(t)
+        return True
+    
     def get_variable(self, variable_name):
+        """Returns a `Variable` with variable_name as its identifier."""
         if self._variables.has_key(variable_name):
             return self._variables.get(variable_name)
         else:
@@ -313,10 +370,19 @@ class Context(object):
     
     def add_variable(self, variable_name, type, node=None):
         """Adds a variable to the current scope."""
+        if not self.type_defs.is_valid_name(variable_name):
+            raise TargetTypeCheckException(
+                            "Invalid identifier or type name: %s"%
+                            variable_name, node)
+        
         if not isinstance(type, Type):
             raise TargetTypeCheckException(
                                         "Expected subclass of Type but got %s"%
                                         str(type), node)
+        
+        if variable_name in self.type_defs.reserved():
+            raise TargetTypeCheckExpceiton("%s is a reserved word."%
+                                           variable_name,Node)
         
         scope = self._scope[-1] #the current scope.
 
@@ -329,7 +395,10 @@ class Context(object):
                 node)
         
         # Add the identifier to the scope.
-        type.enter_scope(Variable(variable_name),self,scope)
+        if variable_name in self._variables.keys():
+            type.enter_scope(self._variables.get(variable_name), self,scope)
+        else:    
+            type.enter_scope(Variable(variable_name),self,scope)
 
     def change_scope(self):
         """Adds another scope. Everything previously in scope remains so."""
@@ -337,13 +406,23 @@ class Context(object):
         
     def leave_scope(self):
         """Moves down in scope. Removes all variables that go out of scope."""
+        
         scope = self._scope[-1] #the current scope.
+        
+        #Remove scope from all identifiers and type names.
         for v in self._variables.values():
             if scope in v.scope:
                 v.get_type_at_scope(scope).leave_scope(v,self,scope)
+        for t in self.typenames:
+            if scope in t.scope:
+                t.scope.remove(scope)
         #Remove out-of-scope identifiers from identifier list.
         for v in self._variables.values():
             if len(v.scope) == 0: self._variables.pop(v.name)
+        #Removed out-of-scope typenames
+        for t in self.typenames:
+            if len(t.scope) == 0: 
+                self.typenames.remove(t)
 
 
 ################################################################################
@@ -496,7 +575,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         # Add the function to the enclosing scope.
         func_t = FunctionType(function_name, param_types, return_type)
-        self._g.add_variable(func_t.get_variable_name(), func_t, node)
+        self._g.add_variable(func_t.name, func_t, node)
                
         # Create a new scope for the function defintion.
         self._g.change_scope()
@@ -528,8 +607,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                         (str(f), str(f.return_type), str(return_type)), node)
     
     def visit_FuncCall(self, node):
-        func_type = self._g.get_variable(
-                          FunctionType.variable_name(node.name.name)).get_type()
+        func_type = self._g.get_variable(node.name.name).get_type()
+
+        if not isinstance(func_type,FunctionType):
+            raise TargetTypeCheckException("called '%s' is not a function"%
+                            func_type.name, node)
         
         #Get the parameter types
         param_types = list()
@@ -619,7 +701,12 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         return self.visit(node.to_type)
     
     def visit_Typename(self, node):
-        return self.visit(node.type)
+        t = self.visit(node.type)
+        for q in node.quals:
+            t.add_qual(q)
+        return t
+            
+    
     
     def visit_Constant(self, node):
         return Type(node.type)
@@ -724,5 +811,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         for s in node.storage:
             t.add_storage_spec(s)
         
-        return TypeDef(node.name, t)
-        
+        t = TypeDef(node.name, t)
+        self._g.add_variable(node.name, t, node)
+        return t
+    
