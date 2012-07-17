@@ -342,6 +342,17 @@ int main() {
 
 
 ################################################################################
+#Pointers
+################################################################################
+
+check("""
+int main() {
+    int* x;
+}
+""")
+
+
+################################################################################
 #Struct
 ################################################################################
 
@@ -364,11 +375,45 @@ int main() {
         char y;
     } XXX;
     XXX a;
+    a.x = 1;
+    a.y = 'c';
+}
+XXX x;
+""",False) #XXX typedef is out of scope at last line.
+
+check("""
+int main() {
+    typedef struct {
+        int x;
+        char y;
+    } XXX;
+    XXX a;
     XXX b;
     a.x = b;
 }
-""",False)
+""",False) #assignment
 
+check("""
+int main() {
+    typedef struct {
+        int x;
+        char y;
+    } XXX;
+    XXX* a;
+    a.x;
+}
+""",False) #ptrs, no ptrs.
+
+check("""
+int main() {
+    typedef struct {
+        int x;
+        char y;
+    } XXX;
+    XXX a;
+    a->x;
+}
+""",False) #ptrs, no ptrs.
 
 ################################################################################
 #Union Types

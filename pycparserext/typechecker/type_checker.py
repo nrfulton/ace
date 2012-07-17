@@ -906,7 +906,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         return struct.get_type().get_type(self.get_ID(node.field))
         
-            
-        
-        
+    def visit_PtrDecl(self, node):
+        t = self.visit(node.type)
+        t.is_ptr = True
+        for q in node.quals:
+            t.add_qual(q)
+        return t
         
