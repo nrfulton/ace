@@ -79,17 +79,22 @@ int main(int x) {
 }
 """)
 check(stuff + """
-int main(int x) {
+int fun(int x) {
     stuff x;
-    return main(s);
+    return fun(s);
 }
 """,False) #wrong param
 
 #Multiple functions
 check("""
-int main(int x) { return x; }
-int other() { int x; int y; return main(y); }
+int fun(int x) { return x; }
+int other() { int x; int y; return fun(y); }
 """)
+
+check("""
+int fun(int x) { return x; }
+int other() { int x; int y; return fun(y,y); }
+""",False) #too many args passed to fun.
 
 check("""
 int main() {
@@ -97,6 +102,19 @@ int main() {
     main();
 }
 """,False)#redeclaring main as a non-function.
+
+#Ellisis
+check("""
+int func(int x, char y, ...) { return func(1,'c',2,3,4); }
+""")
+
+check("""
+int func(int x, char y, ...) { return func(1,'c'); }
+""")
+
+check("""
+int func(int x, char y, ...) { return func(1); }
+""",False)
 
 ################################################################################
 #Conditionals (if, switch, ternary)
@@ -491,4 +509,18 @@ int main() {
     } udata;
     udata.z;
 }
-""",False) #z isn't a member.'
+""",False) #z isn't a member.
+
+################################################################################
+#Named Initializers
+################################################################################
+
+#check("""
+#int main() {
+#    union u {
+#        int x;
+#        char y;
+#    } udata = {'c'};
+#    udata.x;
+#}
+#""") #TODO named initializers.

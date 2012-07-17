@@ -128,11 +128,12 @@ class Type(object):
         storage: list of storage specifiers (extern, register, etc.)
         bitsize: bit field size, or None
         """
-        self.name     = name
-        self.quals    = list()
-        self.storage  = list()
-        self.funcspec = list()
-        self.bitsize  = None 
+        self.name           = name
+        self.declared_name  = None
+        self.quals          = list()
+        self.storage        = list()
+        self.funcspec       = list()
+        self.bitsize        = None 
         
         #Array types
         self.is_array = False
@@ -312,6 +313,18 @@ class EnumType(Type):
             raise TargetTypeCheckException("enum name with reserved word",None)
         return True
 
+class EllipsisType(Type):
+    """TODO not sure what to do with this."""
+    def __init__(self):
+        super(EllipsisType,self).__init__("...")
+    
+    def enter_scope(self,v,g,scope):
+        pass
+    def leave_scope(self,v,g,scope):
+        pass
+    def exists(self,type_defs):
+        return True
+
 class FunctionType(Type):
     """A function type in the target language. """
     
@@ -322,6 +335,12 @@ class FunctionType(Type):
         self.param_types   = param_types
         self.return_type    = return_type 
 
+    def has_ellipsis(self):
+        for t in self.param_types:
+            if isinstance(t, EllipsisType):
+                return True
+        return False
+    
     def enter_scope(self, v, g, scope):
         g.type_defs.exists(self)
         if not g._variables.has_key(v.name):
@@ -641,8 +660,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         param_types = list()
         if not node.decl.type.args == None:
             for param in node.decl.type.args.params:
-                param_names.append(param.type.declname)
-                param_types.append(Type(param.type.type.names[0]))
+                t = self.visit(param)
+                param_names.append(t.declared_name)
+                param_types.append(t)
+                #param_types.append(Type(param.type.type.names[0]))
         
         # Add the function to the enclosing scope.
         func_t = FunctionType(function_name, param_types, return_type)
@@ -690,17 +711,23 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                 param_types.append(self.visit(e))
         
         # Ensure that the parameter lists are the same size
-        if not len(param_types) == len(func_type.param_types):
+        if not len(param_types) == len(func_type.param_types) \
+        and (not func_type.has_ellipsis() \
+             or len(param_types) < len(func_type.param_types)-1):        
             raise TargetTypeCheckException(
                     "Wrong number of arguments passed to %s" %
                     (str(func_type)), node)
         
         # Ensure that parameter types match declared parameter types.
+        #Because zip uses  the smallest list, 
         for p,ep in zip(param_types, func_type.param_types):
+            #Skip over the ellipsis, anything following won't be in the zip.
+            if isinstance(ep, EllipsisType):
+                continue
             if not self._g.type_defs.sub(p, ep):
                 raise TargetTypeCheckException(
                         "Arguments to %s are incorrect: expected %s but got %s"%
-                        (str(func_type),p,ep), node)
+                        (str(func_type),ep,p), node)
         
         # Return the return type.
         return func_type.return_type 
@@ -734,6 +761,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                 raise TargetTypeCheckException(
                 "Incompatable types when assigning to %s (type: %s) from type %s" % 
                 (name, str(type), str(initial_value_type)), node)
+        
+        return type
         
         
 
@@ -794,12 +823,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         to the context.
         """
         t = self.visit(node.type)
+        t.declared_name = node.declname
         if not node.quals == None:
             for q in node.quals:
                 t.add_qual(q)
-        
-        
-        
         return t
 
     def visit_IdentifierType(self, node):
@@ -951,5 +978,9 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             type = TypeDef(node.name, struct_t)
             self._g.add_variable(node.name, type, node)
             return type
-        
+    
+    def visit_EllipsisParam(self, node):
+        return EllipsisType()
+    
+    
         
