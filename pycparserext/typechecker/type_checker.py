@@ -203,6 +203,28 @@ class Type(object):
                                     "Storage specifier %s unknown"%s,None)
         return True
 
+class UnionType(Type):
+    """A union. Similar to struct, but doesn't declare a typename."""
+    def __init__(self, name, members):
+        super(StructType, self).__init__(name)
+        self.name    = name
+        self.members = members
+    
+    def has_member(self, name):
+        for n in self.members.keys():
+            if n == name: return True
+        return False
+    
+    def get_type(self, name):
+        for n in self.members.keys():
+            if n == name: return self.members[n]
+        raise TargetTypeCheckException("Struct member %s not found"%name,None)
+
+    def exists(self, type_defs):
+        #Ensure that all member types are valid types.
+        for m_type in self.members.values():
+            m_type.exists(type_defs)
+            
 class StructType(Type):
     """A struct"""
     def __init__(self, name, members):
@@ -295,6 +317,7 @@ class FunctionType(Type):
     
     def __init__(self, name, param_types=list(),
                  return_type=Type("void")):
+        super(FunctionType,self).__init__(name)
         self.name          = name # Part of the type because functions aren't values.
         self.param_types   = param_types
         self.return_type    = return_type 
@@ -638,8 +661,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         # Move out of the function definition scope.
         self._g.leave_scope()
     
-    def visit_Compound(self, node):
-        """TODO? """
+    def visit_Compound(self, node): 
         self.visit_children(node)
     
     def visit_Return(self, node):
@@ -875,8 +897,10 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         #Capture declarations in a new context
         old_g = self._g
         self._g = Context()
-        for m in node.decls:
-            self.visit(m)
+        
+        if not node.decls == None:
+            for m in node.decls:
+                self.visit(m)
         
         #Get the types and names of attributes
         members = dict()
@@ -912,4 +936,20 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         for q in node.quals:
             t.add_qual(q)
         return t
+    
+            
+    def visit_Union(self, node):
+        """A Union."""
+        if self._g.is_typename(node.name):
+            return self._g.get_typename_type(node.name)
+        else:
+            #Treat unions that haven't already been declared like structs.
+            if node.decls == None:
+                raise TargetTypeCheckException("Storage size of %s unknown"%
+                                               node.name,node)
+            struct_t =  self.visit_Struct(node)
+            type = TypeDef(node.name, struct_t)
+            self._g.add_variable(node.name, type, node)
+            return type
+        
         

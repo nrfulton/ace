@@ -9,6 +9,7 @@ OCL_PARSER = OpenCLCParser() #The constructor does some heavy lifting.
 def check(code, expect_success=True, show_trace=False, show_ast=False):
     """The template for all tests in this file."""
     ast = OCL_PARSER.parse(code)
+    if show_ast: ast.show()
     g = Context()
     tc = checker.OpenCLTypeChecker(g) #create checker w/ new ctx
     try:
@@ -18,11 +19,10 @@ def check(code, expect_success=True, show_trace=False, show_ast=False):
         if not expect_success:
             assert True 
         else:
-            if show_ast: ast.show()
             if show_trace: traceback.print_exc()
             print "ERROR: %s" % e.message
             assert False #false negatives
-
+            
 
 ################################################################################
 #Code Snippets
@@ -351,6 +351,35 @@ int main() {
 }
 """)
 
+#check("""
+#typedef struct { int x; } S;
+#int main() {
+#    S *s, t;
+#    s->x = 1;
+#    t.x = 1;
+#}
+#""") # TODO should pass... the * should go to the s only, read S *s,t
+
+
+################################################################################
+#Struct
+################################################################################
+
+check(stuff + """
+int main() {
+    int x,y,z;
+    x = y = z;
+}
+""")
+
+check(stuff + """
+int main() {
+    int x,y,z;
+    stuff s;
+    y = s;
+}
+""",False)
+
 
 ################################################################################
 #Struct
@@ -415,24 +444,51 @@ int main() {
 }
 """,False) #ptrs, no ptrs.
 
+
+################################################################################
+#Compound Literal
+################################################################################
+
+#check("""
+#typedef struct { int x,y; } XXX;
+#int main() {
+#    XXX x = {1,2};
+#    return x.x;
+#}
+#""") #TODO-sub this shoud work.
+
 ################################################################################
 #Union Types
 ################################################################################
-#
-#check("""
-#int main() {
-#    union u {
-#        int x;
-#        char y;
-#    };
-#}
-#""")
-#
-#check("""
-#int main() {
-#    union u {
-#        int x;
-#        char y;
-#    } udata;
-#}
-#""")
+
+check("""
+int main() {
+    union U {
+        int x;
+        char y;
+    };
+    union U x;
+    x.x;
+}
+""")
+
+check("""
+int main() {
+    union u {
+        int x;
+        char y;
+    } udata;
+    udata.x;
+    udata.y;
+}
+""")
+
+check("""
+int main() {
+    union u {
+        int x;
+        char y;
+    } udata;
+    udata.z;
+}
+""",False) #z isn't a member.'
