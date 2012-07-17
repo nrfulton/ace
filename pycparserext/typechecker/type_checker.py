@@ -1,6 +1,7 @@
 import pycparser
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
+import types
 #import cypy
 
 ################################################################################
@@ -203,28 +204,6 @@ class Type(object):
                 raise TargetTypeCheckException(
                                     "Storage specifier %s unknown"%s,None)
         return True
-
-class UnionType(Type):
-    """A union. Similar to struct, but doesn't declare a typename."""
-    def __init__(self, name, members):
-        super(StructType, self).__init__(name)
-        self.name    = name
-        self.members = members
-    
-    def has_member(self, name):
-        for n in self.members.keys():
-            if n == name: return True
-        return False
-    
-    def get_type(self, name):
-        for n in self.members.keys():
-            if n == name: return self.members[n]
-        raise TargetTypeCheckException("Struct member %s not found"%name,None)
-
-    def exists(self, type_defs):
-        #Ensure that all member types are valid types.
-        for m_type in self.members.values():
-            m_type.exists(type_defs)
             
 class StructType(Type):
     """A struct"""
@@ -738,9 +717,13 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_Decl(self, node):
         """Adds a declared variable to the context."""
         name = node.name
-
+        
         #Get the base type
         type = self.visit(node.type)
+
+        if not isinstance(type,Type):
+            raise TargetTypeCheckException("Expected Type but found %s"%
+                                           type.__class__.__name__,node)
         
         #Enrich the type with c99 goodness.
         if not node.quals == None:
@@ -756,11 +739,42 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         #Ensure that type of the initial value matches the declared type.
         if node.init != None:
-            initial_value_type = self.visit(node.init) 
-            if not self._g.type_defs.sub(type , initial_value_type):
-                raise TargetTypeCheckException(
-                "Incompatable types when assigning to %s (type: %s) from type %s" % 
-                (name, str(type), str(initial_value_type)), node)
+            #could be a list or a scalar.
+            initial_value_type = self.visit(node.init)
+             
+            if isinstance(initial_value_type,types.ListType):
+                if (type.is_array or type.is_ptr):
+                    if not len(initial_value_type) == type.dim:
+                        raise TargetTypeCheckException(
+                        "Type %s expected dimension %s but initialized to %s"%
+                            (str(type),str(type.dim),len(initial_value_type)),
+                            node)
+                    for t in initial_value_type:
+                        if not self._g.type_defs.sub(t, type):
+                            raise TargetTypeCheckException(
+                            "Wrong type in initializer for %s"%str(type),node)
+
+                elif isinstance(type, StructType):
+                    if len(initial_value_type) > len(type.members.values()):
+                        raise TargetTypeCheckException(
+                        "Type %s expected dimension %s but initialized to %s"%
+                            (str(type),len(type.members.values()),
+                             len(initial_value_type)),node)
+                    for t,et in zip(initial_value_type, type.members.values()):
+                        if not self._g.type_defs.sub(t,et):
+                            raise TargetTypeCheckException(
+                            "Expected %s but found %s in struct initializer %s"%
+                            (str(et),str(t),str(type)), node)
+                            
+                else:
+                    raise TargetTypeCheckException("Assigned list to scalar %s"%
+                                                   str(type),node)         
+           
+            else:
+                if not self._g.type_defs.sub(initial_value_type,type):
+                    raise TargetTypeCheckException(
+                    "Incompatable types when assigning to %s (%s) from type %s"% 
+                    (name, str(type), str(initial_value_type)), node)
         
         return type
         
@@ -824,9 +838,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         """
         t = self.visit(node.type)
         t.declared_name = node.declname
+        
         if not node.quals == None:
             for q in node.quals:
                 t.add_qual(q)
+    
         return t
 
     def visit_IdentifierType(self, node):
@@ -850,25 +866,13 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                             "Expected valid Array dimension type but found %s"%
                             str(dim_t), node)
         t.is_array = True
-        t.dim = node.dim
+        t.dim = types.IntType(node.dim.value)
         return t
     
     def visit_ExprList(self, node):
-        #TODO do the right thing.
-        """Returns an Array of the last expr's type. TODO"""
-        t = None #the type
-        for e in node.exprs:
-            if t == None:
-                t = self.visit(e)
-            else:
-                e_t = self.visit(e)
-                if not self._g.type_defs.sub(t, e_t):
-                    raise TargetTypeCheckException(
-                     "Expected all expressions to have type %s, but found %s"%
-                     (str(t), str(e_t)), node)
-        t.is_array = True
-        t.dim = len(node.exprs)
-        return t
+        expression_types = list()
+        for e in node.exprs: expression_types.append(self.visit(e))
+        return expression_types
     
     def visit_ArrayRef(self, node):
         array_t = self.visit(node.name)
@@ -963,7 +967,6 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         for q in node.quals:
             t.add_qual(q)
         return t
-    
             
     def visit_Union(self, node):
         """A Union."""
@@ -977,10 +980,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             struct_t =  self.visit_Struct(node)
             type = TypeDef(node.name, struct_t)
             self._g.add_variable(node.name, type, node)
-            return type
+            return struct_t
     
     def visit_EllipsisParam(self, node):
         return EllipsisType()
-    
-    
-        

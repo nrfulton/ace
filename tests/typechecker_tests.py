@@ -21,8 +21,7 @@ def check(code, expect_success=True, show_trace=False, show_ast=False):
         else:
             if show_trace: traceback.print_exc()
             print "ERROR: %s" % e.message
-            assert False #false negatives
-            
+            assert False #false negatives   
 
 ################################################################################
 #Code Snippets
@@ -36,14 +35,6 @@ typedef struct {
 } stuff;
 """
 check(stuff)
-
-
-################################################################################
-#Compound Statements
-################################################################################
-
-#TODO visit_Compound needs to manage scope, but that causes issues ATM for some reason.
-
 
 ################################################################################
 #Function Definition and Application
@@ -376,7 +367,7 @@ int main() {
 #    s->x = 1;
 #    t.x = 1;
 #}
-#""") # TODO should pass... the * should go to the s only, read S *s,t
+#""") # TODO bug in the parser?
 
 
 ################################################################################
@@ -462,19 +453,6 @@ int main() {
 }
 """,False) #ptrs, no ptrs.
 
-
-################################################################################
-#Compound Literal
-################################################################################
-
-#check("""
-#typedef struct { int x,y; } XXX;
-#int main() {
-#    XXX x = {1,2};
-#    return x.x;
-#}
-#""") #TODO-sub this shoud work.
-
 ################################################################################
 #Union Types
 ################################################################################
@@ -511,16 +489,54 @@ int main() {
 }
 """,False) #z isn't a member.
 
+
+################################################################################
+#Compound Literal
+################################################################################
+
+check("""
+typedef struct { int x; int y; } XXX;
+int main() {
+    XXX x = {1,2};
+    return x.x;
+}
+""")
+
+check("""
+typedef struct { int x; int y; } XXX;
+int main() {
+    XXX x = {1};
+    return x.x;
+}
+""")
+
+check("""
+typedef struct { int x; int y; } XXX;
+int main() {
+    XXX x = {1,2,3};
+    return x.x;
+}
+""",False)#too many initializer args
+
+check(stuff + """
+typedef struct { int x; int y; } XXX;
+int main() {
+    stuff s;
+    XXX x = {1,s};
+    return x.x;
+}
+""",False)#wrong initializer type
+
 ################################################################################
 #Named Initializers
 ################################################################################
 
-#check("""
-#int main() {
-#    union u {
-#        int x;
-#        char y;
-#    } udata = {'c'};
-#    udata.x;
-#}
-#""") #TODO named initializers.
+check("""
+int main() {
+    union u {
+        int x;
+        char y;
+    } udata = {'c'};
+    udata.x;
+}
+""") 
