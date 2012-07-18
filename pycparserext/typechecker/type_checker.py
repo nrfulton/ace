@@ -8,7 +8,7 @@ import types
 #                      TYPING CHECKING RULES                                   #
 ################################################################################
 class TypeDefinitions(object):
-    """ Part of the context that enforces C99.
+    """ This class contains a definition of C99.
     
     We build up types and then call `exists` just before introducing
     a variable in to the context in order to ensure that the variable's type is
@@ -24,17 +24,21 @@ class TypeDefinitions(object):
         self.types.append("int")
         self.types.append("char")
         self.types.append("void")
+        #...
         
         #qualifiers
         self.quals = list()
         self.quals.append("const")
+        #,,,
         
         #storage specifiers
         self.storage = list()
-        self.storage.append("typedef") #http://msdn.microsoft.com/en-us/library/w9hwbe3d.aspx
+        self.storage.append("typedef")
+        #...
         
         #function specifiers
         self.funcspec = list()
+        #...
     
     def typename_exists(self, name):
         if name in self.types:
@@ -119,7 +123,12 @@ class TypeDefinitions(object):
 ################################################################################
 
 class Type(object):
-    """An OpenCL Type."""
+    """Represents a declared type. 
+    
+    This class Contains all the information used by TypeDefinitions, contains
+    type-specific logic for entering and leaving a scope, and is 
+    subclassed for structs and functions. 
+    """
     def __init__(self, name):
         """Initialized a new Type; based on Decl in pycparser/c_ast.cfg
         
@@ -206,7 +215,7 @@ class Type(object):
         return True
             
 class StructType(Type):
-    """A struct"""
+    """A struct that handles type names."""
     def __init__(self, name, members):
         super(StructType, self).__init__(name)
         self.name    = name
@@ -293,7 +302,7 @@ class EnumType(Type):
         return True
 
 class EllipsisType(Type):
-    """TODO not sure what to do with this."""
+    """A dummy type for ellipses in function arguments."""
     def __init__(self):
         super(EllipsisType,self).__init__("...")
     
@@ -305,7 +314,7 @@ class EllipsisType(Type):
         return True
 
 class FunctionType(Type):
-    """A function type in the target language. """
+    """A function type. """
     
     def __init__(self, name, param_types=list(),
                  return_type=Type("void")):
@@ -342,6 +351,7 @@ class FunctionType(Type):
 #                                 IDENTIFIERS                                  #
 ################################################################################
 
+#This class should be renamed to Identifier.
 class Variable(object):
     """A Variable is an Identifier and a scope. 
     
@@ -390,11 +400,7 @@ class TypeName(object):
         self.scope = list()
         
 class Context(object):
-    """A context for typechecking C-style programs.
-    
-    The primary reason this is C-style is that the scope is a stack, and 
-    functions aren't treated a values. 
-    """
+    """A context for typechecking C-style programs."""
     def __init__(self):
         self.returning   = False   #True iff checker is inside a return stmt
         self.functions   = list()  #stack, determines type of returning func.
