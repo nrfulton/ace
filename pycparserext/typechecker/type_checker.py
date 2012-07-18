@@ -5,6 +5,261 @@ import types
 #import cypy
 
 ################################################################################
+#C99 defintion
+################################################################################
+
+def c99fn(name,args=list(),return_type="void"):
+    """Gets a FunctionType for a c99 built-in function"""
+    return FunctionType(name,
+                        [Type(t_name) for t_name in args],
+                        Type(return_type))
+
+c99_binops = ("+","-")
+c99_conditional_ops = ("==","!=","<","<=",">",">=")
+
+op_pairs = {
+    ('uchar', 'uchar'): 'uint',
+    ('uchar', 'char'): 'uint',
+    ('uchar', 'ushort'): 'uint',
+    ('uchar', 'short'): 'uint',
+    ('uchar', 'uint'): 'uint',
+    ('uchar', 'int'): 'uint',
+    ('uchar', 'ulong'): 'uint',
+    ('uchar', 'long'): 'ulong',
+    ('uchar', 'half'): 'float',
+    ('uchar', 'float'): 'float',
+    ('uchar', 'double'): 'double',
+    ('uchar', 'uintptr_t'): 'uintptr_t',
+    ('uchar', 'intptr_t'): 'uintptr_t',
+    ('uchar', 'size_t'): 'size_t',
+    ('uchar', 'ptrdiff_t'): 'size_t',
+    
+    ('char', 'uchar'): 'uint',
+    ('char', 'char'): 'int',
+    ('char', 'ushort'): 'uint',
+    ('char', 'short'): 'int',
+    ('char', 'uint'): 'uint',
+    ('char', 'int'): 'int',
+    ('char', 'ulong'): 'ulong',
+    ('char', 'long'): 'long',
+    ('char', 'half'): 'float',
+    ('char', 'float'): 'float',
+    ('char', 'double'): 'double',
+    ('char', 'uintptr_t'): 'uintptr_t',
+    ('char', 'intptr_t'): 'intptr_t',
+    ('char', 'size_t'): 'size_t',
+    ('char', 'ptrdiff_t'): 'ptrdiff_t',
+    
+    ('ushort', 'uchar'): 'uint',
+    ('ushort', 'char'): 'uint',
+    ('ushort', 'ushort'): 'uint',
+    ('ushort', 'short'): 'uint',
+    ('ushort', 'uint'): 'uint',
+    ('ushort', 'int'): 'uint',
+    ('ushort', 'ulong'): 'uint',
+    ('ushort', 'long'): 'ulong',
+    ('ushort', 'half'): 'float',
+    ('ushort', 'float'): 'float',
+    ('ushort', 'double'): 'double',
+    ('ushort', 'uintptr_t'): 'uintptr_t',
+    ('ushort', 'intptr_t'): 'uintptr_t',
+    ('ushort', 'size_t'): 'size_t',
+    ('ushort', 'ptrdiff_t'): 'size_t',
+    
+    ('short', 'uchar'): 'uint',
+    ('short', 'char'): 'int',
+    ('short', 'ushort'): 'uint',
+    ('short', 'short'): 'int',
+    ('short', 'uint'): 'uint',
+    ('short', 'int'): 'int',
+    ('short', 'ulong'): 'ulong',
+    ('short', 'long'): 'long',
+    ('short', 'half'): 'float',
+    ('short', 'float'): 'float',
+    ('short', 'double'): 'double',
+    ('short', 'uintptr_t'): 'uintptr_t',
+    ('short', 'intptr_t'): 'intptr_t',
+    ('short', 'size_t'): 'size_t',
+    ('short', 'ptrdiff_t'): 'ptrdiff_t',
+    
+    ('uint', 'uchar'): 'uint',
+    ('uint', 'char'): 'uint',
+    ('uint', 'ushort'): 'uint',
+    ('uint', 'short'): 'uint',
+    ('uint', 'uint'): 'uint',
+    ('uint', 'int'): 'uint',
+    ('uint', 'ulong'): 'ulong',
+    ('uint', 'long'): 'ulong',
+    ('uint', 'half'): 'float',
+    ('uint', 'float'): 'float',
+    ('uint', 'double'): 'double',
+    ('uint', 'uintptr_t'): 'uintptr_t',
+    ('uint', 'intptr_t'): 'uintptr_t',
+    ('uint', 'size_t'): 'size_t',
+    ('uint', 'ptrdiff_t'): 'size_t',
+    
+    ('int', 'uchar'): 'uint',
+    ('int', 'char'): 'int',
+    ('int', 'ushort'): 'uint',
+    ('int', 'short'): 'int',
+    ('int', 'uint'): 'uint',
+    ('int', 'int'): 'int',
+    ('int', 'ulong'): 'ulong',
+    ('int', 'long'): 'long',
+    ('int', 'half'): 'float',
+    ('int', 'float'): 'float',
+    ('int', 'double'): 'double',
+    ('int', 'uintptr_t'): 'uintptr_t',
+    ('int', 'intptr_t'): 'intptr_t',
+    ('int', 'size_t'): 'size_t',
+    ('int', 'ptrdiff_t'): 'ptrdiff_t',
+    
+    ('ulong', 'uchar'): 'ulong',
+    ('ulong', 'char'): 'ulong',
+    ('ulong', 'ushort'): 'ulong',
+    ('ulong', 'short'): 'ulong',
+    ('ulong', 'uint'): 'ulong',
+    ('ulong', 'int'): 'ulong',
+    ('ulong', 'ulong'): 'ulong',
+    ('ulong', 'long'): 'ulong',
+    ('ulong', 'half'): None,
+    ('ulong', 'float'): 'float',
+    ('ulong', 'double'): 'double',
+    ('ulong', 'uintptr_t'): 'ulong',
+    ('ulong', 'intptr_t'): 'ulong',
+    ('ulong', 'size_t'): 'ulong',
+    ('ulong', 'ptrdiff_t'): 'ulong',
+    
+    ('long', 'uchar'): 'ulong',
+    ('long', 'char'): 'long',
+    ('long', 'ushort'): 'ulong',
+    ('long', 'short'): 'long',
+    ('long', 'uint'): 'ulong',
+    ('long', 'int'): 'long',
+    ('long', 'ulong'): 'ulong',
+    ('long', 'long'): 'long',
+    ('long', 'half'): None,
+    ('long', 'float'): 'float',
+    ('long', 'double'): 'double',
+    ('long', 'uintptr_t'): 'ulong',
+    ('long', 'intptr_t'): 'long',
+    ('long', 'size_t'): 'ulong',
+    ('long', 'ptrdiff_t'): 'long',
+    
+    ('half', 'uchar'): 'float',
+    ('half', 'char'): 'float',
+    ('half', 'ushort'): 'float',
+    ('half', 'short'): 'float',
+    ('half', 'uint'): 'float',
+    ('half', 'int'): 'float',
+    ('half', 'ulong'): None,
+    ('half', 'long'): None,
+    ('half', 'half'): 'float',
+    ('half', 'float'): 'float',
+    ('half', 'double'): 'double',
+    ('half', 'uintptr_t'): None,
+    ('half', 'intptr_t'): None,
+    ('half', 'size_t'): None,
+    ('half', 'ptrdiff_t'): None,
+    
+    ('float', 'uchar'): 'float',
+    ('float', 'char'): 'float',
+    ('float', 'ushort'): 'float',
+    ('float', 'short'): 'float',
+    ('float', 'uint'): 'float',
+    ('float', 'int'): 'float',
+    ('float', 'ulong'): 'float',
+    ('float', 'long'): 'float',
+    ('float', 'half'): 'float',
+    ('float', 'float'): 'float',
+    ('float', 'double'): 'double',
+    ('float', 'uintptr_t'): 'float',
+    ('float', 'intptr_t'): 'float',
+    ('float', 'size_t'): 'float',
+    ('float', 'ptrdiff_t'): 'float',
+        
+    ('double', 'uchar'): 'double',
+    ('double', 'char'): 'double',
+    ('double', 'ushort'): 'double',
+    ('double', 'short'): 'double',
+    ('double', 'uint'): 'double',
+    ('double', 'int'): 'double',
+    ('double', 'ulong'): 'double',
+    ('double', 'long'): 'double',
+    ('double', 'half'): 'double',
+    ('double', 'float'): 'double',
+    ('double', 'double'): 'double',
+    ('double', 'uintptr_t'): 'double',
+    ('double', 'intptr_t'): 'double',
+    ('double', 'size_t'): 'double',
+    ('double', 'ptrdiff_t'): 'double',
+    
+    ('uintptr_t', 'uchar'): 'uintptr_t',
+    ('uintptr_t', 'char'): 'uintptr_t',
+    ('uintptr_t', 'ushort'): 'uintptr_t',
+    ('uintptr_t', 'short'): 'uintptr_t',
+    ('uintptr_t', 'uint'): 'uintptr_t',
+    ('uintptr_t', 'int'): 'uintptr_t',
+    ('uintptr_t', 'ulong'): 'ulong',
+    ('uintptr_t', 'long'): 'ulong',
+    ('uintptr_t', 'half'): None,
+    ('uintptr_t', 'float'): 'float',
+    ('uintptr_t', 'double'): 'double',
+    ('uintptr_t', 'uintptr_t'): 'uintptr_t',
+    ('uintptr_t', 'intptr_t'): 'uintptr_t',
+    ('uintptr_t', 'size_t'): 'uintptr_t',   
+    ('uintptr_t', 'ptrdiff_t'): 'uintptr_t',
+    
+    ('intptr_t', 'uchar'): 'uintptr_t',
+    ('intptr_t', 'char'): 'intptr_t',
+    ('intptr_t', 'ushort'): 'uintptr_t',
+    ('intptr_t', 'short'): 'intptr_t',
+    ('intptr_t', 'uint'): 'uintptr_t',
+    ('intptr_t', 'int'): 'intptr_t',
+    ('intptr_t', 'ulong'): 'ulong',
+    ('intptr_t', 'long'): 'long',
+    ('intptr_t', 'half'): None,
+    ('intptr_t', 'float'): 'float',
+    ('intptr_t', 'double'): 'double',
+    ('intptr_t', 'uintptr_t'): 'uintptr_t',
+    ('intptr_t', 'intptr_t'): 'intptr_t',
+    ('intptr_t', 'size_t'): 'uintptr_t',
+    ('intptr_t', 'ptrdiff_t'): 'intptr_t',
+    
+    ('size_t', 'uchar'): 'size_t',
+    ('size_t', 'char'): 'size_t',
+    ('size_t', 'ushort'): 'size_t',
+    ('size_t', 'short'): 'size_t',
+    ('size_t', 'uint'): 'size_t',
+    ('size_t', 'int'): 'size_t',
+    ('size_t', 'ulong'): 'ulong',
+    ('size_t', 'long'): 'ulong',
+    ('size_t', 'half'): None,
+    ('size_t', 'float'): 'float',
+    ('size_t', 'double'): 'double',
+    ('size_t', 'uintptr_t'): 'uintptr_t',
+    ('size_t', 'intptr_t'): 'uintptr_t',
+    ('size_t', 'size_t'): 'size_t',   
+    ('size_t', 'ptrdiff_t'): 'size_t',
+    
+    ('ptrdiff_t', 'uchar'): 'size_t',
+    ('ptrdiff_t', 'char'): 'ptrdiff_t',
+    ('ptrdiff_t', 'ushort'): 'size_t',
+    ('ptrdiff_t', 'short'): 'ptrdiff_t',
+    ('ptrdiff_t', 'uint'): 'size_t',
+    ('ptrdiff_t', 'int'): 'ptrdiff_t',
+    ('ptrdiff_t', 'ulong'): 'ulong',
+    ('ptrdiff_t', 'long'): 'long',
+    ('ptrdiff_t', 'half'): None,
+    ('ptrdiff_t', 'float'): 'float',
+    ('ptrdiff_t', 'double'): 'double',
+    ('ptrdiff_t', 'uintptr_t'): 'uintptr_t',
+    ('ptrdiff_t', 'intptr_t'): 'intptr_t',
+    ('ptrdiff_t', 'size_t'): 'size_t',   
+    ('ptrdiff_t', 'ptrdiff_t'): 'ptrdiff_t',
+}
+
+################################################################################
 #                      TYPING CHECKING RULES                                   #
 ################################################################################
 class TypeDefinitions(object):
@@ -19,13 +274,23 @@ class TypeDefinitions(object):
         #The context
         self._g = context
         
-        #built-in types
-        self.types = list()
-        self.types.append("int")
-        self.types.append("char")
-        self.types.append("void")
-        #...
+        #built-in functions
+        self.functions = dict()
+        self.functions["tanh"] = c99fn("tanh", ("double",), "double")
+        self.functions["tanhf"] = c99fn("tanh", ("float",), "float")
+        self.functions["tanhl"] = c99fn("tanh", ("long double",), "long double")
         
+        #built-in type names
+        self.types = ("uchar", "char",
+         "ushort", "short",
+         "uint", "int",
+         "ulong", "long",
+         "uintptr_t", "intptr_t",
+         "size_t", "ptrdiff_t",
+         "half", "float", "double",
+         "void", "bool",
+         "long double") #TODO find all the combinations...
+
         #qualifiers
         self.quals = list()
         self.quals.append("const")
@@ -36,7 +301,7 @@ class TypeDefinitions(object):
         self.storage.append("typedef")
         #...
         
-        #function specifiers
+        #OpenCL function specifiers
         self.funcspec = list()
         #...
     
@@ -70,7 +335,7 @@ class TypeDefinitions(object):
         To check if a dimension is correct use this functio nas one of the args
         to `equal`.
         """
-        return Type("int")
+        return Type("int") #TODO change to size_t
     
     def switch_type(self):
         """Type of switch statements."""
@@ -90,14 +355,27 @@ class TypeDefinitions(object):
     
     def return_type(self, op, lhs, rhs=None):
         """Typechecks and resolves types for ops, including assignment."""
-        if(op == "=="):
-            return self.cond_type()
+        if(op in c99_conditional_ops):
+            if rhs == None or not self.sub(lhs,rhs):
+                raise TargetTypeCheckException("lhs and rhs of = should have "+
+                                               "compatable types.",None)
+            return self.cond_type() 
+        
+        if(op in c99_binops):
+            try:
+                return op_pairs[lhs.name,rhs.name]
+            except KeyError as e:
+                raise TargetTypeCheckException("Operation between %s and %s "%
+                                               (lhs.name,rhs.name)+"undefined.",
+                                               None)
         if(op == "="):
             if rhs == None:
-                raise TargetTypeCheckException("= is binary but only one argument given",None)
+                raise TargetTypeCheckException("= is binary but only one " +
+                                               "argument given",None)
             if not self.sub(lhs,rhs):
-                raise TargetTypeCheckException("lhs and rhs of = should have the same type.",None)
-        return lhs
+                raise TargetTypeCheckException("lhs and rhs of = should have "+
+                                               "compatable types.",None)
+            return lhs
     
     def sub(self, lhs, rhs):
         """Returns true if lhs and be used where rhs is expected per c99."""
@@ -316,8 +594,7 @@ class EllipsisType(Type):
 class FunctionType(Type):
     """A function type. """
     
-    def __init__(self, name, param_types=list(),
-                 return_type=Type("void")):
+    def __init__(self, name, param_types=list(), return_type=Type("void")):
         super(FunctionType,self).__init__(name)
         self.name          = name # Part of the type because functions aren't values.
         self.param_types   = param_types
@@ -416,6 +693,13 @@ class Context(object):
         #Context variables specific to a statement's form.
         self.switch_type = Type(None) #Type of switch condition.
     
+    def get_function(self, name):
+        """Returns the Type of a function."""
+        if name in self._variables:
+            return self.get_variable(name).get_type()
+        else:
+            return self.type_defs.functions[name]
+            
     def is_typename(self,name):
         for t in self.typenames:
             if t.name == name: return True
@@ -683,7 +967,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                         (str(f), str(f.return_type), str(return_type)), node)
     
     def visit_FuncCall(self, node):
-        func_type = self._g.get_variable(node.name.name).get_type()
+        func_type = self._g.get_function(node.name.name)
 
         if not isinstance(func_type,FunctionType):
             raise TargetTypeCheckException("called '%s' is not a function"%
@@ -742,6 +1026,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             type.set_bitsize(node.bitsize)
         
         self._g.add_variable(name, type, node)
+        
         
         #Ensure that type of the initial value matches the declared type.
         if node.init != None:
@@ -853,11 +1138,12 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 
     def visit_IdentifierType(self, node):
         """Returns a Type for the identifier.""" #TODO Quals?
-        name = node.names[0]
+        name = " ".join(node.names)
+        
         if self._g.is_typename(name):
             return self._g.get_typename_type(name)
         else:
-            return Type(node.names[0])
+            return Type(name)
 
     def visit_PreprocessorLine(self, node):
         raise TargetTypeCheckException("Expected preprocessed code "+

@@ -244,6 +244,8 @@ op_pairs = {
     ('ptrdiff_t', 'ptrdiff_t'): 'ptrdiff_t',
 }
 
+print op_pairs[('size_t','ptrdiff_tt')]
+
 types = ("uchar", "char",
          "ushort", "short",
          "uint", "int",
