@@ -5,7 +5,7 @@ from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
 import traceback
 
-OCL_PARSER = OpenCLCParser() #The constructor does some heavy lifting.
+OCL_PARSER = OpenCLCParser() #For speed, we only initialize once.
 def check(code, expect_success=True, show_trace=False, show_ast=False):
     """The template for all tests in this file."""
     ast = OCL_PARSER.parse(code)
@@ -551,12 +551,27 @@ int main() {
 
 
 ################################################################################
-#Multi-name types
+#Misc. C stuff
 ################################################################################
+
 check("""
-int main() {
-    long double x;
-    long double y;
-    y = x;
+inline void func() {
+    int x = 0;
+}
+""")
+
+check("""
+int func() {
+    return abs(-1);
+}
+""")
+
+################################################################################
+#Funtion specifiers
+################################################################################
+
+check("""
+__kernel int func() {
+    return 1;
 }
 """)

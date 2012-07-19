@@ -10,14 +10,33 @@ import types
 
 def c99fn(name,args=list(),return_type="void"):
     """Gets a FunctionType for a c99 built-in function"""
-    return FunctionType(name,
-                        [Type(t_name) for t_name in args],
-                        Type(return_type))
+    #Create types out of argument names.
+    arg_types = list()
+    for arg in args:
+        if arg.endswith("*"):
+            arg.pop()
+            t = Type(arg)
+            t.is_ptr = True
+            arg_types.append(t)
+        else:
+            arg_types.append(Type(arg))
+    
+    #Create type out of return type name
+    return_type_t = None
+    if return_type.endswith("*"):
+        return_type.pop()
+        return_type_t = Type(return_type)
+        return_type_t.is_ptr = True
+    else:
+        return_type_t = Type(return_type)
+        
+    return FunctionType(name, arg_types, return_type_t)
 
 c99_binops = ("+","-")
 c99_conditional_ops = ("==","!=","<","<=",">",">=")
+c99_unary_ops = ("-","!")
 
-op_pairs = {
+c99_op_pairs = {
     ('uchar', 'uchar'): 'uint',
     ('uchar', 'char'): 'uint',
     ('uchar', 'ushort'): 'uint',
@@ -259,6 +278,84 @@ op_pairs = {
     ('ptrdiff_t', 'ptrdiff_t'): 'ptrdiff_t',
 }
 
+#Vector types
+c99_scalar_types = ("uchar", "char",
+         "ushort", "short",
+         "uint", "int",
+         "ulong", "long",
+         "uintptr_t", "intptr_t",
+         "size_t", "ptrdiff_t",
+         "half", "float", "double",
+         "void", "bool") 
+
+vector_type_sizes = (2, 3, 4, 8, 16)
+
+c99_vector_types = list()
+for t in c99_scalar_types:
+    for s in vector_type_sizes: c99_vector_types.append("%s%s"%(t,s))
+
+#left can be substituted for right.
+c99_substitutions = (
+                     #char
+                     ('char', 'uchar'),
+                     ('char', 'int'),
+                     #uchar
+                     ('uchar', 'char'),
+                     
+                     #int
+                     ('int', 'uint'),
+                     ('int', 'size_t'),
+                     ('int', 'long'),
+                     #uint
+                     ('uint','int'),
+                     
+                     #long
+                     ('long', 'ulong'),
+                     ('long', 'int'),
+                     #ulong
+                     ('ulong','long'),
+                     
+                     #size_t
+                     ('size_t', 'int'),
+                    )
+def transitive_sub_r(given,expected,intermediate,tested):
+    """Use trensitive_sub
+    
+    intermediate = the current left hand size.
+    
+    tested = a list of values that have already been attempted, and is used for
+    cycle avoidance.
+    """
+    if given == None or intermediate == None: return False
+    if intermediate == None: intermediate = given
+    tested.append(intermediate)
+    for s in c99_substitutions:
+        if s[0] == intermediate:
+            if s[1] == expected: return True
+            if not s[1] in tested:
+                if transitive_sub_r(given,expected,s[1],tested):
+                    return True
+    return False
+#Searches the other way around -- in practice, I they're equally efficient. 
+#def transitive_sub_r(given,expected,intermediate,tested):
+#
+#    if intermediate == None: intermediate = expected
+#    tested.append(intermediate)  
+#    for s in c99_substitutions:
+#        if s[1] == intermediate:
+#            if s[0] == given:
+#                return True
+#            if not s[0] in tested:
+#                if transitive_sub_r(given,expected,s[0],tested):
+#                    return True
+#    return False
+
+def transitive_sub(given,expected):
+    """Determines if there's a path from given to expected in c99_substitutions.
+    """
+    return transitive_sub_r(given, expected, expected, list())
+
+
 ################################################################################
 #                      TYPING CHECKING RULES                                   #
 ################################################################################
@@ -270,26 +367,125 @@ class TypeDefinitions(object):
     valid C99.
     """ 
     def __init__(self, context):       
-        """Todo populate from OCL spec""" 
+        """Populates the object with data from the c99 specification."""
         #The context
         self._g = context
         
-        #built-in functions
+        #built-in OpenCL Integer
+        #TODO this was generated based on the OpenCL spec, but there's a lot of
+        #unnecessary reptition -- each function needs only one defintion 
+        #(in terms of ints.)
+        ### Begin generated code ###
         self.functions = dict()
         self.functions["tanh"] = c99fn("tanh", ("double",), "double")
         self.functions["tanhf"] = c99fn("tanh", ("float",), "float")
-        self.functions["tanhl"] = c99fn("tanh", ("long double",), "long double")
+        self.functions["get_work_dim"] = c99fn("get_work_dim", (), "uint")
+        self.functions["get_global_size"] = c99fn("get_global_size",("uint",), "size_t")
+        self.functions["get_global_id"] = c99fn("get_global_id",("uint",), "size_t")
+        self.functions["get_local_id"] = c99fn("get_local_id",("uint",), "size_t")
+        self.functions["get_num_groups"] = c99fn("get_num_groups",("uint",), "size_t")
+        self.functions["get_group_it"] = c99fn("get_group_it",("uint",), "size_t")
+        #char implies uchar due to sub.
+        self.functions["abs"] = c99fn("abs",("short",), "ushort")
+        self.functions["abs"] = c99fn("abs",("int",), "uint")
+        self.functions["abs"] = c99fn("abs",("long",), "ulong")
+        self.functions["abs_diff"] = c99fn("abs_diff",("char","char"), "uchar")
+        self.functions["abs_diff"] = c99fn("abs_diff",("short","short"), "ushort")
+        self.functions["abs_diff"] = c99fn("abs_diff",("int","int"), "uint")
+        self.functions["abs_diff"] = c99fn("abs_diff",("long","long"), "ulong")
+        self.functions["add_sat"] = c99fn("add_sat",("char","char"), "char")
+        self.functions["add_sat"] = c99fn("add_sat",("short","short"), "short")
+        self.functions["add_sat"] = c99fn("add_sat",("int","int"), "int")
+        self.functions["add_sat"] = c99fn("add_sat",("long","long"), "long")
+        self.functions["hadd"] = c99fn("hadd",("char","char"), "char")
+        self.functions["hadd"] = c99fn("hadd",("short","short"), "short")
+        self.functions["hadd"] = c99fn("hadd",("int","int"), "int")
+        self.functions["hadd"] = c99fn("hadd",("long","long"), "long")
+        self.functions["rhadd"] = c99fn("rhadd",("char","char"), "char")
+        self.functions["rhadd"] = c99fn("rhadd",("short","short"), "short")
+        self.functions["rhadd"] = c99fn("rhadd",("int","int"), "int")
+        self.functions["rhadd"] = c99fn("rhadd",("long","long"), "long")
+        self.functions["clz"] = c99fn("clz",("char",), "char")
+        self.functions["clz"] = c99fn("clz",("short",), "short")
+        self.functions["clq"] = c99fn("clq",("int",), "int")
+        self.functions["clq"] = c99fn("clq",("long",), "long")
+        self.functions["mad_hi"] = c99fn("mad_hi",("char","char","char"), "char")
+        self.functions["mad_hi"] = c99fn("mad_hi",("short","short","short"), "short")
+        self.functions["mad_hi"] = c99fn("mad_hi",("int","int","int"), "int")
+        self.functions["mad_hi"] = c99fn("mad_hi",("long","long","long"), "long")
+        self.functions["mad24"] = c99fn("mad24",("char","char","char"), "char")
+        self.functions["mad24"] = c99fn("mad24",("short","short","short"), "short")
+        self.functions["mad24"] = c99fn("mad24",("int","int","int"), "int")
+        self.functions["mad24"] = c99fn("mad24",("long","long","long"), "long")
+        self.functions["mad_sat"] = c99fn("mad_sat",("char","char","char"), "char")
+        self.functions["mad_sat"] = c99fn("mad_sat",("short","short","short"), "short")
+        self.functions["mad_sat"] = c99fn("mad_sat",("int","int","int"), "int")
+        self.functions["mad_sat"] = c99fn("mad_sat",("long","long","long"), "long")
+        self.functions["max"] = c99fn("max",("char","char"), "char")
+        self.functions["max"] = c99fn("max",("short","short"), "short")
+        self.functions["max"] = c99fn("max",("int","int"), "int")
+        self.functions["max"] = c99fn("max",("long","long"), "long")
+        self.functions["max"] = c99fn("max",("char","char2"), "char")
+        self.functions["max"] = c99fn("max",("short","short2"), "short")
+        self.functions["max"] = c99fn("max",("int","int2"), "int")
+        self.functions["max"] = c99fn("max",("long","long2"), "long")
+        self.functions["max"] = c99fn("max",("char","char4"), "char")
+        self.functions["max"] = c99fn("max",("short","short4"), "short")
+        self.functions["max"] = c99fn("max",("int","int4"), "int")
+        self.functions["max"] = c99fn("max",("long","long4"), "long")
+        self.functions["max"] = c99fn("max",("char","char8"), "char")
+        self.functions["max"] = c99fn("max",("short","short8"), "short")
+        self.functions["max"] = c99fn("max",("int","int8"), "int")
+        self.functions["max"] = c99fn("max",("long","long8"), "long")
+        self.functions["max"] = c99fn("max",("char","char16"), "char")
+        self.functions["max"] = c99fn("max",("short","short16"), "short")
+        self.functions["max"] = c99fn("max",("int","int16"), "int")
+        self.functions["max"] = c99fn("max",("long","long16"), "long")
+        self.functions["min"] = c99fn("min",("char","char"), "char")
+        self.functions["min"] = c99fn("min",("short","short"), "short")
+        self.functions["min"] = c99fn("min",("int","int"), "int")
+        self.functions["min"] = c99fn("min",("long","long"), "long")
+        self.functions["min"] = c99fn("min",("char","char2"), "char")
+        self.functions["min"] = c99fn("min",("short","short2"), "short")
+        self.functions["min"] = c99fn("min",("int","int2"), "int")
+        self.functions["min"] = c99fn("min",("long","long2"), "long")
+        self.functions["min"] = c99fn("min",("char","char4"), "char")
+        self.functions["min"] = c99fn("min",("short","short4"), "short")
+        self.functions["min"] = c99fn("min",("int","int4"), "int")
+        self.functions["min"] = c99fn("min",("long","long4"), "long")
+        self.functions["min"] = c99fn("min",("char","char8"), "char")
+        self.functions["min"] = c99fn("min",("short","short8"), "short")
+        self.functions["min"] = c99fn("min",("int","int8"), "int")
+        self.functions["min"] = c99fn("min",("long","long8"), "long")
+        self.functions["min"] = c99fn("min",("char","char16"), "char")
+        self.functions["min"] = c99fn("min",("short","short16"), "short")
+        self.functions["min"] = c99fn("min",("int","int16"), "int")
+        self.functions["min"] = c99fn("min",("long","long16"), "long")
+        self.functions["mul_hi"] = c99fn("mul_hi",("char","char","char"), "char")
+        self.functions["mul_hi"] = c99fn("mul_hi",("short","short","short"), "short")
+        self.functions["mul_hi"] = c99fn("mul_hi",("int","int","int"), "int")
+        self.functions["mul_hi"] = c99fn("mul_hi",("long","long","long"), "long")
+        self.functions["mul24"] = c99fn("mul24",("char","char","char"), "char")
+        self.functions["mul24"] = c99fn("mul24",("short","short","short"), "short")
+        self.functions["mul24"] = c99fn("mul24",("int","int","int"), "int")
+        self.functions["mul24"] = c99fn("mul24",("long","long","long"), "long")
+        self.functions["rotate"] = c99fn("rotate",("char","char","char"), "char")
+        self.functions["rotate"] = c99fn("rotate",("short","short","short"), "short")
+        self.functions["rotate"] = c99fn("rotate",("int","int","int"), "int")
+        self.functions["rotate"] = c99fn("rotate",("long","long","long"), "long")
+        self.functions["subsat"] = c99fn("subsat",("char","char","char"), "char")
+        self.functions["subsat"] = c99fn("subsat",("short","short","short"), "short")
+        self.functions["subsat"] = c99fn("subsat",("int","int","int"), "int")
+        self.functions["subsat"] = c99fn("subsat",("long","long","long"), "long")
+        ### End generated code ###
+        
+        #Valid substitutions
+        self.valid_substituations = [(Type(x[0]),Type(x[1])) for x in c99_substitutions]
         
         #built-in type names
-        self.types = ("uchar", "char",
-         "ushort", "short",
-         "uint", "int",
-         "ulong", "long",
-         "uintptr_t", "intptr_t",
-         "size_t", "ptrdiff_t",
-         "half", "float", "double",
-         "void", "bool",
-         "long double") #TODO find all the combinations...
+        self.types = list()
+        for scalar_t in c99_scalar_types: self.types.append(scalar_t)
+        for vector_t in c99_vector_types: self.types.append(vector_t)
 
         #qualifiers
         self.quals = list()
@@ -301,9 +497,8 @@ class TypeDefinitions(object):
         self.storage.append("typedef")
         #...
         
-        #OpenCL function specifiers
-        self.funcspec = list()
-        #...
+        #function specifiers, enforced during parsing.
+        self.funcspec = ("inline","explicit","virtual")
     
     def typename_exists(self, name):
         if name in self.types:
@@ -335,7 +530,7 @@ class TypeDefinitions(object):
         To check if a dimension is correct use this functio nas one of the args
         to `equal`.
         """
-        return Type("int") #TODO change to size_t
+        return Type("size_t")
     
     def switch_type(self):
         """Type of switch statements."""
@@ -361,9 +556,17 @@ class TypeDefinitions(object):
                                                "compatable types.",None)
             return self.cond_type() 
         
+        if op in c99_unary_ops:
+            #TODO
+            return lhs
+        
         if(op in c99_binops):
+            if rhs == None:
+                raise TargetTypeCheckException(
+                            "%s is a binop but only one argument is defined."%
+                            op,None)
             try:
-                return op_pairs[lhs.name,rhs.name]
+                return Type(c99_op_pairs[lhs.name,rhs.name])
             except KeyError as e:
                 raise TargetTypeCheckException("Operation between %s and %s "%
                                                (lhs.name,rhs.name)+"undefined.",
@@ -378,12 +581,17 @@ class TypeDefinitions(object):
             return lhs
     
     def sub(self, lhs, rhs):
-        """Returns true if lhs and be used where rhs is expected per c99."""
-        #TODO take into account typenames.
+        """Returns true if lhs and be used where rhs is expected."""
         if not isinstance(lhs, Type): return False
         if not isinstance(rhs, Type): return False
-        return lhs.name == rhs.name
-    
+        if lhs.name == rhs.name: return True
+#        for pair in self.valid_substituations:
+#            if pair[0] = lhs.name and pair[1] = rhs.name: return True
+        if transitive_sub(lhs.name, rhs.name): 
+#            if lhs.is_array == rhs.is_array and lhs.is_ptr == rhs.is_ptr:
+            return True
+        return False
+        
     def reserved(self):
         """Words that cannot be used as variable names."""
         reserved_words = list()
