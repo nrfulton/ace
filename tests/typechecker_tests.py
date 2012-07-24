@@ -4,6 +4,7 @@ from pycparserext.typechecker.type_checker import Context
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
 import traceback
+import cypy
 
 OCL_PARSER = OpenCLCParser() #For speed, we only initialize once.
 def check(code, expect_success=True, show_trace=False, show_ast=False):
@@ -106,14 +107,6 @@ int func(int x, char y, ...) { return func(1,'c'); }
 check("""
 int func(int x, char y, ...) { return func(1); }
 """,False)
-
-#built-in functions
-check("""
-int main() {
-    double x;
-    double y = tanh(x);
-}
-""")
 
 ################################################################################
 #Conditionals (if, switch, ternary)
@@ -551,7 +544,7 @@ int main() {
 
 
 ################################################################################
-#Misc. C stuff
+#Misc. C/OCL stuff
 ################################################################################
 
 check("""
@@ -563,6 +556,24 @@ inline void func() {
 check("""
 int func() {
     return abs(-1);
+}
+""")
+
+
+#built-in functions
+check("""
+int func() {
+    short x;
+    short y = tanh(x);
+}
+""")
+
+check("""
+int func() {
+    char x;
+    char y;
+    short z;
+    z = upsample(x,y);
 }
 """)
 
