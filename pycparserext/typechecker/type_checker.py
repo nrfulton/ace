@@ -514,14 +514,34 @@ for t in c99_scalar_types:
 c99_substitutions = (
                      #char
                      ('char', 'uchar'),
+                     ('char', 'short'),
+                     ('char', 'ushort'),
                      ('char', 'int'),
+                     ('char', 'uint'),
+                     ('char', 'long'),
+                     ('char', 'ulong'),
+                     
                      #uchar
                      ('uchar', 'char'),
+                     
+                     #short
+                     ('short', 'int'),
+                     
+                     #ushort
+                     ('ushort','int'),
                      
                      #int
                      ('int', 'uint'),
                      ('int', 'size_t'),
                      ('int', 'long'),
+                     ('int', 'char'),
+                     ('int', 'uchar'),
+                     ('int', 'short'),
+                     ('int', 'ushort'),
+                     ('int', 'uint'),
+                     ('int', 'long'),
+                     ('int', 'ulong'),
+                     
                      #uint
                      ('uint','int'),
                      
@@ -530,6 +550,7 @@ c99_substitutions = (
                      ('long', 'int'),
                      #ulong
                      ('ulong','long'),
+                     ('ulong','int'),
                      
                      #size_t
                      ('size_t', 'int'),
@@ -1436,6 +1457,7 @@ class Context(object):
         self._variables  = dict()  #name -> `Variable`  
         self._scope      = list()  #stack.
         self._scope.append(0)
+        self.unresolved_forward_decls = list() #of variable names.
         
         self.typenames = list()  #of TypeNames
         
@@ -1672,27 +1694,46 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 
     def visit_FuncDeclExt(self, node):
         """Extended (OpenCL) function definition."""
-        return self.visit(node.type)
-
-    def visit_FuncDef(self, node):
-        """Function definition."""
-        # Get the function's name and return type.
-        function_name = node.decl.name
-        return_type   = self.visit(node.decl.type) #Type(node.decl.type.type.type.names[0])
+        # Get the function's name and return type
+        function_name = node.type.declname
+        return_type = self.visit(node.type)
         
-        # Get the parameter names and types
+        # Get the function parameter names and types
         param_names = list()
         param_types = list()
-        if not node.decl.type.args == None:
-            for param in node.decl.type.args.params:
+        if not node.args == None:
+            for param in node.args.params:
                 t = self.visit(param)
                 param_names.append(t.declared_name)
                 param_types.append(t)
-                #param_types.append(Type(param.type.type.names[0]))
         
-        # Add the function to the enclosing scope.
+        # Create the function type
         func_t = FunctionType(function_name, param_types, return_type)
-        self._g.add_variable(func_t.name, func_t, node)
+        
+        # Add the function declaration
+        if not (function_name in self._g.unresolved_forward_decls):    
+            self._g.add_variable(func_t.name, func_t, node)
+            self._g.unresolved_forward_decls.append(function_name)
+        else:
+            f = self._g.get_variable(function_name).get_type()
+            
+            if not self._g.type_defs.sub(f.return_type, func_t.return_type):
+                raise TargetTypeCheckException("Reclaraction of fwd decl",node)
+            for (t1,t2) in zip(f.param_types,func_t.param_types):
+                if not self._g.type_defs.sub(t2, t1):
+                    raise TargetTypeCheckException("Reclaraction of fwd decl",
+                                                   node)
+            return f
+        
+        return func_t
+                
+
+    def visit_FuncDef(self, node):
+        """Function body definition."""
+        function_t = self.visit(node.decl)
+        
+        param_names = [t.declared_name for t in function_t.param_types]
+        param_types = [t for t in function_t.param_types]
                
         # Create a new scope for the function defintion.
         self._g.change_scope()
@@ -1706,6 +1747,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         # Move out of the function definition scope.
         self._g.leave_scope()
+        
+        return function_t
     
     def visit_Compound(self, node): 
         self.visit_children(node)
@@ -1777,10 +1820,14 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         
         #Get the base type
         type = self.visit(node.type)
-
+        
+        #Skip functions; handled by visit_funcdeclext.
+        if isinstance(type, FunctionType):
+            return type
+        
         if not isinstance(type,Type):
-            raise TargetTypeCheckException("Expected Type but found %s"%
-                                           type.__class__.__name__,node)
+            raise TargetTypeCheckException("Expected Type but found %s" %
+                                           str(type),node)
         
         #Enrich the type with c99 goodness.
         if not node.quals == None:

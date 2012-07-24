@@ -9,7 +9,7 @@ import cypy
 OCL_PARSER = OpenCLCParser() #For speed, we only initialize once.
 def check(code, expect_success=True, show_trace=False, show_ast=False):
     """The template for all tests in this file."""
-    ast = OCL_PARSER.parse(code)
+    ast = OCL_PARSER.parse(code)        
     if show_ast: ast.show()
     g = Context()
     tc = checker.OpenCLTypeChecker(g) #create checker w/ new ctx
@@ -107,6 +107,35 @@ int func(int x, char y, ...) { return func(1,'c'); }
 check("""
 int func(int x, char y, ...) { return func(1); }
 """,False)
+
+
+#Fwd Decls
+check(stuff + """
+int function(int);
+
+int function(int x) {
+    return x+1;
+}
+""")
+
+check(stuff + """
+int function(int);
+
+int function(int);
+
+int function(int x) {
+    return x+1;
+}
+""") #appropriate redecl of fwd decls
+
+check(stuff + """
+stuff function(int);
+
+int function(int x) {
+    return x+1;
+}
+""", False) #inappropriate redecl of fwd decls
+
 
 ################################################################################
 #Conditionals (if, switch, ternary)
