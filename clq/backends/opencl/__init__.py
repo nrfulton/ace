@@ -6,6 +6,8 @@ import clq
 from clq import TypeResolutionError
 import clq.backends.base_c as base_c
 import clq.extensions.language_types as cstrings
+from pycparserext.typechecker.type_checker import TypeChecker as TDCChecker
+from pycparserext.typechecker.type_checker import Context as TDCContext
 
 _globals = globals() # used to create lists of types below
 
@@ -360,13 +362,23 @@ def t(name):
 #===============================================================================
 # OpenCL Backend
 #===============================================================================
-class Backend(base_c.Backend):   
+class Backend(base_c.Backend):
     def __init__(self):
         base_c.Backend.__init__(self, "OpenCL")
+        self.tdc_checker = None
+        self.tdc_context = None
         
     def string_type(self):
         return StrType
 
+    def get_tdc_checker(self):
+        if self.tdc_checker == None: self.tdc_checker = TDCChecker()
+        return self.tdc_checker
+    
+    def get_tdc_context(self):
+        if self.tdc_context == None: self.tdc_context = TDCContext()
+        return self.tdc_context
+    
     def check_ConstrainedString_cast(self,context,node):
         """Generates code for downcasts to ConstrainedString types.
         

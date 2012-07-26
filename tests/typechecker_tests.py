@@ -615,3 +615,29 @@ __kernel int func() {
     return 1;
 }
 """)
+
+
+################################################################################
+#Constants
+################################################################################
+
+check("""
+int func() {
+    int x = 2;
+    x = 3;
+}
+""")
+
+check("""
+int func() {
+    enum {one=2,two,three};
+    one = 3;
+}
+""",False) #cannot assign to const.
+
+check("""
+int func() {
+    const int x = 2;
+    x = 3;
+}
+""",False) #cannot assign to const.

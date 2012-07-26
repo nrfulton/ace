@@ -5,7 +5,8 @@ import cypy.astx as astx
 import cypy.cg as cg
 
 import clq
-from clq import TypeResolutionError
+from clq import TypeResolutionError, CodeGenerationError
+from clq.backends.opencl.correspondence import TypeCorrespondence 
 
 class Backend(clq.Backend):
     """A backend that centralizes logic common to C-based languages."""
@@ -31,6 +32,16 @@ class Backend(clq.Backend):
         g.append((cypy.join(context.declarations, "\n"), "\n\n"))
         g.append(context.stmts)
         g.append((context.untab, "\n}\n"))
+        
+        #check that the code is well-typed.
+        try:
+            self.get_tdc_checker().check(g.code, self.get_tdc_context())
+            return_tc_type = self.get_tdc_context().get_function(name)
+            
+        except Exception as e:
+            print e.message
+            raise CodeGenerationError(e.message, None)
+        
         return clq.ProgramItem(name, g.code)
         
     def _yield_arg_str(self, context):

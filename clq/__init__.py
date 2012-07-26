@@ -574,11 +574,20 @@ class Backend(object):
     """Abstract base class for a backend language specification."""
     def __init__(self, name):
         self.name = name
-                
+    
     def init_context(self, context):
         """Initializes a :class:`context <Context>`."""
         pass
     
+    def get_tdc_checker(self):
+        """Returns a type checker for generated code"""
+        raise Error("No type-directed compilation type checker specified for" +
+                    " this backend.") 
+    
+    def get_tdc_context(self):
+        raise Error("No type-directed compilation checking context specified "+
+                    "for this backend.")
+
     def generate_program_item(self, context):
         """Called to generate a :class:`program item <ProgramItem>` for a 
         completed concrete function described by the provided context.

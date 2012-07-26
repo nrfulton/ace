@@ -5,6 +5,20 @@ import types
 #import cypy
 
 ################################################################################
+#Checker
+################################################################################
+class TypeChecker(object):
+    def __init__(self):
+        self.parser = OpenCLCParser()
+
+    def check(self, code, context):
+        """Initiates a check, and throws an error on failure."""
+        ast = self.parser.parse(code)
+        tc = OpenCLTypeChecker(context) #create checker w/ new ctx
+        tc.visit(ast)
+        return True #visit throws exceptions on failure.
+
+################################################################################
 #C99 defintion
 ################################################################################
 
@@ -995,26 +1009,6 @@ builtin_fns["vload_half8"] = BuiltinFn("vload_half8",builtinfnarglist_273)
 builtin_fns["vload_half16"] = BuiltinFn("vload_half16",builtinfnarglist_273)
 ### END GENERATED CODE ###
 
-
-################################################################################
-#            ACE/OCL/Typechecker Correspodence                                 #
-################################################################################
-class Correspondence(object):
-    @classmethod
-    def tc_to_ace(cls, tc_t):
-        """Converts Typechecker type to Ace type."""
-        pass #TODO
-    
-    @classmethod
-    def ace_to_tc(cls, ace_t):
-        """Converts Ace type ot Typechecker type"""
-        pass #TODO
-        
-    @classmethod
-    def tc_to_ocl(cls, tc_t):
-        """Converts Typechecker type to OCL type"""
-        return str(tc_t)
-
 ################################################################################
 #                      TYPING CHECKING RULES                                   #
 ################################################################################
@@ -1140,6 +1134,9 @@ class TypeDefinitions(object):
                                                "compatable types.",None)
             return lhs
     
+    def matching_quals(self, lhs,rhs):
+        return True
+    
     def sub(self, lhs, rhs):
         """Returns true if lhs and be used where rhs is expected."""
         if not isinstance(lhs, Type): 
@@ -1148,12 +1145,13 @@ class TypeDefinitions(object):
         if not isinstance(rhs, Type): 
             raise TargetTypeCheckException("Expected Type but got %s" %
                                            rhs.__class__, None)
+        
+        if not self.matching_quals(lhs, rhs):
+            return False
+        
         if lhs.name == rhs.name: 
             return True
-#        for pair in self.valid_substituations:
-#            if pair[0] = lhs.name and pair[1] = rhs.name: return True
         if transitive_sub(lhs.name, rhs.name): 
-#            if lhs.is_array == rhs.is_array and lhs.is_ptr == rhs.is_ptr:
             return True
         return False
         
@@ -1225,19 +1223,6 @@ class Type(object):
         
         See enter_scope."""
         v.remove_scope(scope)
-          
-    def __str__(self):
-        name = ""
-        for q in self.quals:
-            name = name + "%s " % q
-        for s in self.storage:
-            name = name + "%s " % s
-        for f in self.funcspec:
-            name = name + "%s " % f
-        if self.is_array:
-            name = name + "[%s] " % self.dim
-        name = name + "%s" % self.name
-        return name
 
     def add_qual(self, qual):
         self.quals.append(qual)
@@ -1264,6 +1249,19 @@ class Type(object):
                 raise TargetTypeCheckException(
                                     "Storage specifier %s unknown"%s,None)
         return True
+
+    def __str__(self):
+        name = "Type:"
+        for q in self.quals:
+            name = name + "%s " % q
+        for s in self.storage:
+            name = name + "%s " % s
+        for f in self.funcspec:
+            name = name + "%s " % f
+        if self.is_array:
+            name = name + "[%s] " % self.dim
+        name = name + "%s" % self.name
+        return name
             
 class StructType(Type):
     """A struct that handles type names."""
@@ -1467,12 +1465,20 @@ class Context(object):
         #Context variables specific to a statement's form.
         self.switch_type = Type(None) #Type of switch condition.
     
+        #Other misc. context
+        self.in_decl = False #in declaration
+
     def get_function(self, name):
         """Returns the Type of a function."""
         if name in self._variables:
             return self.get_variable(name).get_type()
-        else:
+        
+        elif name in self.type_defs.functions:
             return self.type_defs.functions[name]
+        else:
+            raise TargetTypeCheckException(
+                                    "No function named %s in current context"%
+                                    name, None)
             
     def is_typename(self,name):
         for t in self.typenames:
@@ -1816,6 +1822,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     
     def visit_Decl(self, node):
         """Adds a declared variable to the context."""
+        self._g.in_decl = True
+        
         name = node.name
         
         #Get the base type
@@ -1880,7 +1888,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                     raise TargetTypeCheckException(
                     "Incompatable types when assigning to %s (%s) from type (%s)"% 
                     (name, str(type), str(initial_value_type)), node)
-        
+
+        self._g.in_decl = False
         return type
         
         
@@ -1891,6 +1900,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_Assignment(self, node):
         """Defers to C99 spec as defined in Type"""
         #Typechecking logic handled by the types.
+        lvalue = self.visit(node.lvalue)
+        if "const" in lvalue.quals and not self._g.in_decl:
+            raise TargetTypeCheckException("Assignment of read-only %s" %
+                                           str(lvalue), node)
+            
         return self._g.type_defs.return_type(node.op, 
                                              self.visit(node.lvalue), 
                                              self.visit(node.rvalue))
