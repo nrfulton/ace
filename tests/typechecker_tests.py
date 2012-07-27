@@ -472,6 +472,14 @@ int main() {
 }
 """,False) #ptrs, no ptrs.
 
+
+check("""
+char* test(char* x) {
+    char* z;
+    return z;
+}
+""")
+
 check("""
 int main() {
     typedef struct {

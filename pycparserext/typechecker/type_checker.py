@@ -1701,8 +1701,9 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
     def visit_FuncDeclExt(self, node):
         """Extended (OpenCL) function definition."""
         # Get the function's name and return type
-        function_name = node.type.declname
+        #function_name = node.type.declname
         return_type = self.visit(node.type)
+        function_name = return_type.declared_name
         
         # Get the function parameter names and types
         param_names = list()

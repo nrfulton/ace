@@ -33,11 +33,9 @@ class Backend(clq.Backend):
         g.append(context.stmts)
         g.append((context.untab, "\n}\n"))
         
-        #check that the code is well-typed.
         try:
             self.get_tdc_checker().check(g.code, self.get_tdc_context())
             return_tc_type = self.get_tdc_context().get_function(name)
-            
         except Exception as e:
             print e.message
             raise CodeGenerationError(e.message, None)
