@@ -2,6 +2,8 @@ import pycparser
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
 import types
+import re #For pattern matching preprocessor lines
+import os #For getting the ACE_OCL_INCLUDES envvar.
 #import cypy
 
 ################################################################################
@@ -1975,8 +1977,46 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             return Type(name)
 
     def visit_PreprocessorLine(self, node):
-        raise TargetTypeCheckException("Expected preprocessed code "+
+        if re.match("^\#include\ ", node.contents):
+            file_name = (node.contents.split(" ")[-1])
+            file_name = file_name.replace("\n","")
+            file_name = file_name.replace("\"","")
+            file_name = file_name.replace("<","")
+            file_name = file_name.replace(">","")
+            header_code = ""
+            
+            #Get header_code
+            paths = ""
+            try:
+                paths = os.environ['ACE_OCL_INCLUDES']
+            except Exception as e:
+                raise TargetTypeCheckException("Must define envvar "+
+                                               "ACE_OCL_INCLUDES",node)
+            include_paths = paths.split(";")
+            for path in include_paths:
+                try:
+                    f = open(path + "/" + file_name)
+                    for line in f:
+                        header_code = "%s%s" % (header_code,line)
+                    #Typecheck the header file, adding to this context.
+                    tc = TypeChecker()
+                    tc_Context = self._g
+                    return tc.check(header_code, tc_Context)
+                    break
+                except Exception as e:
+                    continue     
+            if header_code == "":
+                raise TargetTypeCheckException(
+                                            "Could not find file \"%s\" in %s" %
+                                            (file_name, paths), node)
+            
+            
+            
+        else:
+            raise TargetTypeCheckException("Expected preprocessed code "+
                                        "but found a preprocessor line.", node)
+
+       
     
     def visit_ArrayDecl(self, node):
         t = self.visit(node.type)

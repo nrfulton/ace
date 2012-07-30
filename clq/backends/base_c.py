@@ -12,17 +12,29 @@ class Backend(clq.Backend):
     """A backend that centralizes logic common to C-based languages."""
     def __init__(self, name):
         clq.Backend.__init__(self, name)
+        self.includes = list()
+    
+    def include(self, include):
+        self.includes.append(include)
         
     def init_context(self, context):
         context.modifiers = [ "__kernel" ]
         context.declarations = [ ]
         context.end_stmt = ";\n"
         
+        
     ######################################################################
     ## Generating Program Items
     ######################################################################
     def generate_program_item(self, context):
         g = cg.CG()
+        
+        #Handle includes.
+        for include in self.includes:
+            g.append("#include %s\n" % include)
+        self.includes = list()
+        g.append("\n")
+        
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
         name = self._generate_name(context)

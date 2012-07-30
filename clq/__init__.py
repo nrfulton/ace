@@ -588,6 +588,9 @@ class Backend(object):
         raise Error("No type-directed compilation checking context specified "+
                     "for this backend.")
 
+    def include(self, include):
+        raise Error("Includes not defined for this backend.")
+
     def generate_program_item(self, context):
         """Called to generate a :class:`program item <ProgramItem>` for a 
         completed concrete function described by the provided context.
