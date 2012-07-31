@@ -91,15 +91,6 @@ _str_name = 'char*'
 string = StrType._make_type(_str_name)
 
 #===============================================================================
-# Regular Grammars
-#===============================================================================
-class GrammarType(base_c.GrammarType):
-    pass
-
-def grammar(regex):
-    return GrammarType(_str_name, regex)
-
-#===============================================================================
 # Integers
 #===============================================================================
 class IntegerType(base_c.IntegerType, ScalarType):
@@ -336,11 +327,7 @@ class Backend(base_c.Backend):
     uint_t = uint
     float_t = float
     bool_t = bool
-<<<<<<< HEAD
     string_t = string # TODO: char.private_ptr
-=======
-    string_t = None # char.private_ptr
->>>>>>> parent of 07ab264... i dunno
 
 #############################################################################
 ## OpenCL Extension descriptors
