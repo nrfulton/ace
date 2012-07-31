@@ -807,6 +807,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         program_item = context.backend.generate_program_item(context)
         context.program_item = program_item
         context.program_items.append(program_item)
+        context.backend.add_program_items(context.program_items)
         
         # return final AST
         return astx.copy_node(node,

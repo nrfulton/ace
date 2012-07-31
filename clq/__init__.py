@@ -414,7 +414,12 @@ class GenericFnType(VirtualType):
         return concrete_fn.return_type
     
     def generate_Call(self, context, node):
-        return _generic_generate_Call(context, node)
+        r = _generic_generate_Call(context, node)
+        arg_types = tuple(arg.unresolved_type.resolve(context)
+                          for arg in node.args)
+        concrete_fn = self.generic_fn.compile(context.backend, *arg_types)
+        cypy.extend_front(context.program_items, concrete_fn.program_items)
+        return r
 
 cypy.intern(GenericFnType)
 GenericFn.Type = GenericFnType
@@ -438,7 +443,10 @@ class ConcreteFnType(VirtualType):
         return concrete_fn.return_type
     
     def generate_Call(self, context, node):
-        return _generic_generate_Call(context, node)    
+        r = _generic_generate_Call(context, node)
+        cypy.extend_front(context.program_items, self.concrete_fn.program_items)
+        return r
+    
 cypy.intern(ConcreteFnType)
 ConcreteFn.Type = ConcreteFnType
 
@@ -446,6 +454,7 @@ class Backend(object):
     """Abstract base class for a backend language specification."""
     def __init__(self, name):
         self.name = name
+        self.program_items = cypy.SetList([])
         
     def init_context(self, context):
         """Initializes a :class:`context <Context>`."""
@@ -459,6 +468,11 @@ class Backend(object):
         context.program_item attribute and added to context.program_items.
         """
         raise Error("Backend must provide a method to generate program items.")
+    
+    def add_program_items(self, items):
+        """Called to add the :class:`program items <ProgramItem>` generated
+        by compiling a concrete function to the global list of program items."""
+        self.program_items.extend(items)
         
     def void_type(self, context, node):
         raise TypeResolutionError(
@@ -536,7 +550,7 @@ class Context(object):
         
         self.body = [ ]
         self.stmts = [ ]
-        self.program_items = [ ]
+        self.program_items = cypy.SetList()
                 
         # used to provide base case for resolving multiple assignments
         self._resolving_name = None
@@ -580,6 +594,9 @@ class TypeResolutionError(Error):
     def __init__(self, message, node):
         self.message = message
         self.node = node
+        
+    def __str__(self):
+        return "TypeResolutionError(%s)" % self.message
         
 class CodeGenerationError(Error):
     """Raised to indicate an error during code generation."""

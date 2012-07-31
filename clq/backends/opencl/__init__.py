@@ -515,7 +515,7 @@ class ReservedKeyword(object):
 
 builtins = { }
 """A map from built-in and reserved names to their corresponding descriptor."""
-
+ 
 # TODO: These don't actually do any error checking
 # Work-Item Built-in Functions [6.11.1]
 get_work_dim = BuiltinFn("get_work_dim", lambda D: uint)
