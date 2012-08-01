@@ -5,12 +5,9 @@ import cypy.astx as astx
 import clq
 from clq import TypeResolutionError
 import clq.backends.base_c as base_c
-<<<<<<< HEAD
 import clq.extensions.language_types as cstrings
 from pycparserext.typechecker.type_checker import TypeChecker as TDCChecker
 from pycparserext.typechecker.type_checker import Context as TDCContext
-=======
->>>>>>> clq-simple
 
 _globals = globals() # used to create lists of types below
 
@@ -327,7 +324,6 @@ def t(name):
 class Backend(base_c.Backend):
     def __init__(self):
         base_c.Backend.__init__(self, "OpenCL")
-<<<<<<< HEAD
         self.tdc_checker = None
         self.tdc_context = None
         
@@ -360,9 +356,6 @@ class Backend(base_c.Backend):
             code = "(%s)%s" % (self.string_t.name, node.args[0].id)
             return astx.copy_node(node,   code=code)
     
-=======
-
->>>>>>> clq-simple
     void_t = void
     int_t = int
     uint_t = uint
