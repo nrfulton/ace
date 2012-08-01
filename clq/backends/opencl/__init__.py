@@ -5,9 +5,12 @@ import cypy.astx as astx
 import clq
 from clq import TypeResolutionError
 import clq.backends.base_c as base_c
+<<<<<<< HEAD
 import clq.extensions.language_types as cstrings
 from pycparserext.typechecker.type_checker import TypeChecker as TDCChecker
 from pycparserext.typechecker.type_checker import Context as TDCContext
+=======
+>>>>>>> clq-simple
 
 _globals = globals() # used to create lists of types below
 
@@ -83,56 +86,15 @@ bool = BoolType()
 #===============================================================================
 # Strings
 #===============================================================================
-class StrType(Type):
+class StrType(base_c.StrType, ScalarType):
     @classmethod
     def _make_type(cls, name):
         s = StrType(name)
         return s
-    
-    def is_subtype(self, candidate_type):
-        """Implements subtype reflection and Constrained String Top rules."""
-        if isinstance(candidate_type, cstrings.ConstrainedString):
-            return True
-        else:
-            return candidate_type == StrType
-    
-    def resolve_BinOp(self,context,node):
-        if not isinstance(node.op, _ast.Add):
-            raise clq.TypeResolutionError(
-                                "Operation %s is not supported on Strings" % 
-                                str(node.op), node)
-        right_type = node.right.unresolved_type.resolve(context)
-        
-        try:
-            return self._resolve_BinOp(node.op, right_type, context.backend)
-        except TypeResolutionError as e:
-            if e.node is None:
-                e.node = node
-            raise e
-    
-    def _resolve_BinOp(self,op,right_type,backend):
-        if(isinstance(right_type, StrType)):
-            return StrType
-        else:
-            raise clq.TypeResolutionError("Must be a string",node)
-    
-    def generate_BinOp(self, context, node):
-        left = context.visit(node.left)
-        op = context.visit(node.op)
-        right = context.visit(node.right)
-        
-        code = ("strcat" , "(", left.code, "," , right.code, ")")
-        
-        return astx.copy_node(node,
-            left=left,
-            op=op,
-            right=right,
-            
-            code=code
-        )
-    
 
-string = StrType._make_type('char*') # TODO: char.private_ptr
+# TODO is this right and/or should it go in base_c?
+_str_name = 'char*'
+string = StrType._make_type(_str_name)
 
 #===============================================================================
 # Integers
@@ -365,6 +327,7 @@ def t(name):
 class Backend(base_c.Backend):
     def __init__(self):
         base_c.Backend.__init__(self, "OpenCL")
+<<<<<<< HEAD
         self.tdc_checker = None
         self.tdc_context = None
         
@@ -397,12 +360,15 @@ class Backend(base_c.Backend):
             code = "(%s)%s" % (self.string_t.name, node.args[0].id)
             return astx.copy_node(node,   code=code)
     
+=======
+
+>>>>>>> clq-simple
     void_t = void
     int_t = int
     uint_t = uint
     float_t = float
     bool_t = bool
-    string_t = string
+    string_t = string # TODO: char.private_ptr
 
 #############################################################################
 ## OpenCL Extension descriptors
@@ -577,7 +543,7 @@ class ReservedKeyword(object):
 
 builtins = { }
 """A map from built-in and reserved names to their corresponding descriptor."""
-
+ 
 # TODO: These don't actually do any error checking
 # Work-Item Built-in Functions [6.11.1]
 get_work_dim = BuiltinFn("get_work_dim", lambda D: uint)

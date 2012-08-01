@@ -542,7 +542,40 @@ class ScalarType(Type):
             
             code=code
         )
+
+class StrType(ScalarType):
+    def resolve_BinOp(self,context,node):
+        right_type = node.right.unresolved_type.resolve(context)
+        try:
+            return self._resolve_BinOp(node.op, right_type, context.backend)
+        except TypeResolutionError as e:
+            if e.node is None:
+                e.node = node
+            raise e
+
+    @cypy.memoize
+    def _resolve_BinOp(self, op, right_type, backend):
+        if isinstance(right_type, StrType):
+            return self
+        e =  TypeResolutionError
+        raise TypeResolutionError("String Contantenation is undefined on type %s" % self.name)
+
+    def generate_BinOp(self, context, node):
+        left = context.visit(node.left)
+        op = context.visit(node.op)
+        right = context.visit(node.right)
         
+        #TODO: generate include?
+        code = ("strcat(" , left.code , "," , right.code , ")")
+        
+        return astx.copy_node(node,
+            left=left,
+            op=op,
+            right=right,
+            
+            code=code
+       )
+
     def string_type(self):
         return string_t
         

@@ -4,10 +4,9 @@ import clq.backends.opencl as ocl
 OpenCL = ocl.Backend()
 
 @clq.fn
-def plus(a, b):
+def plusa(a, b):
     return a + b
 plus_ii = plus.compile(OpenCL, ocl.int, ocl.int)
-print plus_ii.program_item.code
 
 @clq.fn
 def plus3(a,b,c,plus):
@@ -17,4 +16,7 @@ program_items = plus3_iii.program_items
 for program_item in program_items:
     print program_item.code
 
+plus_ii = plusa.compile(OpenCL, ocl.int, ocl.int)
 
+for item in plus3_ii.program_items:
+    print item.code
