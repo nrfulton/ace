@@ -9,12 +9,6 @@ os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path)
 OpenCL = ocl.Backend()
 
 OpenCL.include("<stdio.h>")
-##TODO includes.
-#@clq.fn
-#def strcat(a,b):
-#    return a
-#strcat = strcat.compile(OpenCL, ocl.string, ocl.string)
-#print strcat.program_item.code
 
 @clq.fn
 def plus(a, b):

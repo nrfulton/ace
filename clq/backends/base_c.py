@@ -26,6 +26,102 @@ class Backend(clq.Backend):
     ######################################################################
     ## Generating Program Items
     ######################################################################
+    def _typecheck_in_isolation1(self, prior_code, stmt):
+        #Construct some valid opencl that contains only well-typed code and
+        #the current stmt.
+        g = cg.CG()
+        g.append(prior_code)
+        g.append(stmt)
+        code = ret_val = g.code
+        while code.count("{") > code.count("}"):
+            code = code + "}"
+        code = code + ";"
+        
+        self.get_tdc_checker().check()
+        return ret_val
+        
+    def generate_program_item(self, context):
+        name = self._generate_name(context)
+        code = cg.CG()
+        
+        #Handle includes
+        for include in self.includes:
+            g = cg.CG()
+            code_to_check = "#include %s\n" % include
+            #Ensure that this code doesn't cause a typechecking error
+            g.append(code_to_check)
+            self.get_tdc_checker().check(g.code, self.get_tdc_context())
+            #Add to the final code listing.
+            code.append(code_to_check)
+        self.includes = list()
+        g.append("\n\n")
+        
+        #Create the function def/decl code
+        fn_code = cg.CG()
+        fn_code.append(cypy.join(cypy.cons(context.modifiers, 
+                                     (context.return_type.name,)), " "))
+        fn_code.append((" ", name, "("))
+        fn_code.append(cypy.join(self._yield_arg_str(context), ", "))
+        fn_code.append((")"))
+        
+        #Give a forward declaration for the function.
+        g = cg.CG()
+        g.append(fn_code.code)
+        g.append((";\n"))
+        self.get_tdc_checker().check(g.code, self.get_tdc_context())
+        code.append(g.code)
+        
+        #Create an ast node for the function.
+        g = cg.CG()
+        g.append(fn_code.code)
+        g.append("{ } \n")
+        fn_ast = self.get_tdc_checker().get_ast(g.code)
+        
+        #???
+        code.append((cypy.join(context.declarations, "\n"), "\n\n"))
+        
+        #For each line, typecheck the line in isolation, then add to the 
+        #surrounding context.
+        prior_code = ""
+        for stmt in context.stmts:
+            prior_code = self._typecheck_in_isolation(prior_code, stmt)
+        
+        
+        for stmt in context.stmts:
+            print stmt
+#            g = cg.CG()
+#            g.append(stmt)
+#            print g.code
+#            print "\n"
+            
+            
+
+#        for stmt in context.stmts:
+#            #check in isolation.
+#            #A copy of the initial checker/fn ast for isolation tests.
+#            context_copy = self.get_tdc_checker()
+#            fn_copy = fn_ast 
+#        
+#            g = cg.CG()
+#            
+#            g.append(s)
+#            stmt_code = "%s { %s } " % (fn_code, stmt)
+#            stmt_ast = self.get_tdc_checker().get_ast(stmt_code)
+#            
+#            fn_ast.add_stmt_to_fn(fn_ast,stmt_ast)
+#            fn_ast.check_ast
+#            
+#            initial_checker.check()
+#            
+#            code.append(stmt)
+            
+        
+        
+        
+        return clq.ProgramItem(name, code.code)
+            
+        
+
     def generate_program_item(self, context):
         g = cg.CG()
         
@@ -34,7 +130,7 @@ class Backend(clq.Backend):
             g.append("#include %s\n" % include)
         self.includes = list()
         g.append("\n")
-        
+
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
         name = self._generate_name(context)

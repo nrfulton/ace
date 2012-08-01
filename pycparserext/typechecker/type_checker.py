@@ -12,7 +12,19 @@ import os #For getting the ACE_OCL_INCLUDES envvar.
 class TypeChecker(object):
     def __init__(self):
         self.parser = OpenCLCParser()
+    
+    def get_ast(self, code):
+        ast = self.parser.parse(code)
+        return ast
+    
+    def add_stmt_to_fn(self, ast, stmt_ast):
+        ast.body.append(stmt_ast)
 
+    def check_ast(self, ast, context):
+        tc = OpenCLTypeChecker(context) #create checker w/ ctx
+        tc.visit(ast)
+        return True #or exception would have been thrown.
+    
     def check(self, code, context):
         """Initiates a check, and throws an error on failure."""
         ast = self.parser.parse(code)
