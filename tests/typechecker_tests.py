@@ -649,3 +649,19 @@ int func() {
     x = 3;
 }
 """,False) #cannot assign to const.
+
+
+
+check("""
+__kernel char* strcat(char* a, char* b) {
+    
+    return a;
+}
+
+__kernel void plus(char* a, char* b) {
+    char* c;
+
+    c = strcat(a,b);
+    c = "asdf";
+}
+""")

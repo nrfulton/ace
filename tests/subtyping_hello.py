@@ -2,7 +2,12 @@ import clq
 import clq.extensions
 import clq.backends.opencl as ocl
 import clq.extensions.language_types as lang #the regex types extension.
+import os
+import sys
 OpenCL = ocl.Backend()
+
+os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path)
+OpenCL.include("<stdio.h>")
 
 #TEST: Memoizing Language based on regular expression equivalence
 L1 = lang.ConstrainedString(OpenCL, "(.?)+")

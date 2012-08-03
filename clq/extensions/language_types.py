@@ -90,8 +90,15 @@ class ConstrainedString(clq.Type):
         return self._backend.check_ConstrainedString_cast(context,node)
     
     def generate_BinOp(self,context,node):
-        return self._backend.string_type()(
+        node = self._backend.string_type()(
                 self._backend.string_t).generate_BinOp(context,node)
+
+        e = clq.Expression()
+        e.generated_code = node.code
+        e.set_expected_type(self.resolve_BinOp(context, node))
+        context.expressions.append(e)
+        
+        return node
     def resolve_Return(self,context,node):
         return self._backend.string_type()(
                 self._backend.string_t).resolve_Return(context,node)

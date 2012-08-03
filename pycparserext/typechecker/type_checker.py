@@ -22,15 +22,13 @@ class TypeChecker(object):
 
     def check_ast(self, ast, context):
         tc = OpenCLTypeChecker(context) #create checker w/ ctx
-        tc.visit(ast)
-        return True #or exception would have been thrown.
+        return tc.visit(ast)
     
     def check(self, code, context):
         """Initiates a check, and throws an error on failure."""
         ast = self.parser.parse(code)
         tc = OpenCLTypeChecker(context) #create checker w/ new ctx
-        tc.visit(ast)
-        return True #visit throws exceptions on failure.
+        return tc.visit(ast)
 
 ################################################################################
 #C99 defintion
@@ -541,6 +539,8 @@ for t in c99_scalar_types:
 #left can be substituted for right.
 c99_substitutions = (
                      #char
+#                     ('char', 'string'), #TODO
+#                     ('string', 'char'), #TODO
                      ('char', 'uchar'),
                      ('char', 'short'),
                      ('char', 'ushort'),
@@ -1121,7 +1121,9 @@ class TypeDefinitions(object):
         if(op in c99_conditional_ops):
             if rhs == None or not self.sub(lhs,rhs):
                 raise TargetTypeCheckException("lhs and rhs of = should have "+
-                                               "compatable types.",None)
+                                               "compatable types:"+
+                                               "(%s,%s)" % (str(lhs),str(rhs)),
+                                               None)
             return self.cond_type() 
         
         if op in c99_unary_ops:
@@ -1145,28 +1147,40 @@ class TypeDefinitions(object):
                                                "argument given",None)
             if not self.sub(lhs,rhs):
                 raise TargetTypeCheckException("lhs and rhs of = should have "+
-                                               "compatable types.",None)
+                                               "compatable types:"+
+                                               "(%s,%s)" % (str(lhs),str(rhs)),
+                                               None)
             return lhs
     
     def matching_quals(self, lhs,rhs):
         return True
     
+    def _sub_str_char(self,lhs,rhs):
+        """ char* = string b/c that's what the parser does. """
+        if lhs.name == "string" and rhs.name == "char":
+            return rhs.is_ptr or rhs.is_array
+        if rhs.name == "string" and lhs.name == "char":
+            return lhs.is_ptr or lhs.is_array
+
     def sub(self, lhs, rhs):
         """Returns true if lhs and be used where rhs is expected."""
         if not isinstance(lhs, Type): 
-            raise TargetTypeCheckException("Expected Type but got %s" %
+            raise TargetTypeCheckException("Expected Type instance but got %s" %
                                            lhs.__class__, None)
         if not isinstance(rhs, Type): 
-            raise TargetTypeCheckException("Expected Type but got %s" %
+            raise TargetTypeCheckException("Expected Type instance but got %s" %
                                            rhs.__class__, None)
         
         if not self.matching_quals(lhs, rhs):
             return False
         
+        if self._sub_str_char(lhs,rhs):
+            return True
         if lhs.name == rhs.name: 
             return True
         if transitive_sub(lhs.name, rhs.name): 
             return True
+        
         return False
         
     def reserved(self):
@@ -1201,6 +1215,7 @@ class Type(object):
         storage: list of storage specifiers (extern, register, etc.)
         bitsize: bit field size, or None
         """
+        
         self.name           = name
         self.declared_name  = None
         self.quals          = list()

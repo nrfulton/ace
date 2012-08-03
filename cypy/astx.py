@@ -3,6 +3,7 @@
 import ast as _ast 
 
 import cypy
+import clq
 
 def init_node(cls, *args, **kwargs):
     """Initializes an ast node with the provided attributes.
