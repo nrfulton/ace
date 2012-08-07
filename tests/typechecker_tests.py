@@ -390,14 +390,14 @@ int main() {
 }
 """)
 
-#check("""
-#typedef struct { int x; } S;
-#int main() {
-#    S *s, t;
-#    s->x = 1;
-#    t.x = 1;
-#}
-#""") # TODO bug in the parser?
+check("""
+typedef struct { int x; } S;
+int main() {
+    S *s, t;
+    s->x = 1;
+    t->x = 1;
+}
+""") #Parser error?
 
 
 ################################################################################
@@ -665,3 +665,15 @@ __kernel void plus(char* a, char* b) {
     c = "asdf";
 }
 """)
+
+
+check("""
+__kernel char* no_a(char* a, char* b) {
+    
+    return a;
+}
+
+__kernel char* call_no_a() {
+    no_a(a,a);
+}""",False) #a shoudn't be defined in call_no_a
+

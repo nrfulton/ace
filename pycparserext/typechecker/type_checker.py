@@ -47,29 +47,35 @@ IGENTYPES  = ('int','char','long','short')
 
 
 class BuiltinFn(object):
-    """ A built-in function"""
+    """ A built-in function."""
     def __init__(self,name,arg_list):
         """Constructor.
         
-        name = name of function
-        args = list of builtfntypelists
-        return_type = string
+        name: name of function
+        args: list of builtfntypelists
+        return_type: string
         """
+        self.args = list()
         self.name = name
-        self.args = list() #list of lists
-        self.args.append(arg_list)
+        self.signatures = list() #list of lists
+        self.signatures.append(arg_list)
     
     def add_arglist(self, builtin_arg_list):
-        self.args.append(builtin_arg_list)
+        self.signatures.append(builtin_arg_list)
     
     def check(self, candidate_types):
-        for arg_list in self.args:
+        for arg_list in self.signatures:
             if arg_list.check(candidate_types):
                 return True
         return False
 
     def return_type(self, candidate_types):
-        for arg_list in self.args:
+        """Determines the return_type of a function based upon the generic types
+        of its arguments.
+        
+        For example, gentype->sgentype called with argument uint has return type
+        int."""
+        for arg_list in self.signatures:
             if arg_list.check(candidate_types):
                 rt = arg_list.return_type.name
                 if rt == "gentype" or rt == "sgentype" or rt == "igentype" or rt == "ugentype":
@@ -83,7 +89,7 @@ class BuiltinFn(object):
     
     def __str__(self):
         ret =  self.name
-        for arg_list in self.args:
+        for arg_list in self.signatures:
             ret = "%s<%s>" % (ret, str(arg_list))
         return ret
             
@@ -609,7 +615,7 @@ def transitive_sub(given,expected):
 
 
 ################################################################################
-#            BUILT-IN FUNCTIONS                                                #
+#            GENERATED CODE FOR BUILTIN FUNCTIONS -- See ocl_builtins_generator#
 ################################################################################
 ### BEGIN GENERATED CODE ###
 #Parameters
@@ -776,9 +782,9 @@ builtin_fns["fdim"] = BuiltinFn("fdim",builtinfnarglist_12)
 builtin_fns["floor"] = BuiltinFn("floor",builtinfnarglist_8)
 builtin_fns["fma"] = BuiltinFn("fma",builtinfnarglist_31)
 builtin_fns["fmax"] = BuiltinFn("fmax",builtinfnarglist_12)
-builtin_fns["fmax"].args.append(builtinfnarglist_33)
+builtin_fns["fmax"].signatures.append(builtinfnarglist_33)
 builtin_fns["fmin"] = BuiltinFn("fmin",builtinfnarglist_12)
-builtin_fns["fmin"].args.append(builtinfnarglist_33)
+builtin_fns["fmin"].signatures.append(builtinfnarglist_33)
 builtin_fns["fmod"] = BuiltinFn("fmod",builtinfnarglist_12)
 builtin_fns["hypo"] = BuiltinFn("hypo",builtinfnarglist_12)
 builtin_fns["ilogb"] = BuiltinFn("ilogb",builtinfnarglist_38)
@@ -787,10 +793,10 @@ builtin_fns["ilogb4"] = BuiltinFn("ilogb4",builtinfnarglist_38)
 builtin_fns["ilogb8"] = BuiltinFn("ilogb8",builtinfnarglist_38)
 builtin_fns["ilogb16"] = BuiltinFn("ilogb16",builtinfnarglist_38)
 builtin_fns["ldexp"] = BuiltinFn("ldexp",builtinfnarglist_43)
-builtin_fns["ldexp"].args.append(builtinfnarglist_44)
-builtin_fns["ldexp"].args.append(builtinfnarglist_45)
-builtin_fns["ldexp"].args.append(builtinfnarglist_46)
-builtin_fns["ldexp"].args.append(builtinfnarglist_47)
+builtin_fns["ldexp"].signatures.append(builtinfnarglist_44)
+builtin_fns["ldexp"].signatures.append(builtinfnarglist_45)
+builtin_fns["ldexp"].signatures.append(builtinfnarglist_46)
+builtin_fns["ldexp"].signatures.append(builtinfnarglist_47)
 builtin_fns["lgamma"] = BuiltinFn("lgamma",builtinfnarglist_8)
 builtin_fns["log"] = BuiltinFn("log",builtinfnarglist_8)
 builtin_fns["log2"] = BuiltinFn("log2",builtinfnarglist_8)
@@ -801,24 +807,24 @@ builtin_fns["mad"] = BuiltinFn("mad",builtinfnarglist_8)
 builtin_fns["maxmag"] = BuiltinFn("maxmag",builtinfnarglist_12)
 builtin_fns["minmag"] = BuiltinFn("minmag",builtinfnarglist_12)
 builtin_fns["nan"] = BuiltinFn("nan",builtinfnarglist_57)
-builtin_fns["nan"].args.append(builtinfnarglist_58)
-builtin_fns["nan"].args.append(builtinfnarglist_59)
-builtin_fns["nan"].args.append(builtinfnarglist_60)
-builtin_fns["nan"].args.append(builtinfnarglist_61)
+builtin_fns["nan"].signatures.append(builtinfnarglist_58)
+builtin_fns["nan"].signatures.append(builtinfnarglist_59)
+builtin_fns["nan"].signatures.append(builtinfnarglist_60)
+builtin_fns["nan"].signatures.append(builtinfnarglist_61)
 builtin_fns["nextafter"] = BuiltinFn("nextafter",builtinfnarglist_12)
 builtin_fns["pow"] = BuiltinFn("pow",builtinfnarglist_12)
 builtin_fns["pown"] = BuiltinFn("pown",builtinfnarglist_43)
-builtin_fns["pown"].args.append(builtinfnarglist_44)
-builtin_fns["pown"].args.append(builtinfnarglist_45)
-builtin_fns["pown"].args.append(builtinfnarglist_46)
-builtin_fns["pown"].args.append(builtinfnarglist_47)
+builtin_fns["pown"].signatures.append(builtinfnarglist_44)
+builtin_fns["pown"].signatures.append(builtinfnarglist_45)
+builtin_fns["pown"].signatures.append(builtinfnarglist_46)
+builtin_fns["pown"].signatures.append(builtinfnarglist_47)
 builtin_fns["powr"] = BuiltinFn("powr",builtinfnarglist_12)
 builtin_fns["rint"] = BuiltinFn("rint",builtinfnarglist_8)
 builtin_fns["rootn"] = BuiltinFn("rootn",builtinfnarglist_43)
-builtin_fns["rootn"].args.append(builtinfnarglist_44)
-builtin_fns["rootn"].args.append(builtinfnarglist_45)
-builtin_fns["rootn"].args.append(builtinfnarglist_46)
-builtin_fns["rootn"].args.append(builtinfnarglist_47)
+builtin_fns["rootn"].signatures.append(builtinfnarglist_44)
+builtin_fns["rootn"].signatures.append(builtinfnarglist_45)
+builtin_fns["rootn"].signatures.append(builtinfnarglist_46)
+builtin_fns["rootn"].signatures.append(builtinfnarglist_47)
 builtin_fns["round"] = BuiltinFn("round",builtinfnarglist_8)
 builtin_fns["rsqrt"] = BuiltinFn("rsqrt",builtinfnarglist_8)
 builtin_fns["sin"] = BuiltinFn("sin",builtinfnarglist_8)
@@ -866,144 +872,144 @@ builtin_fns["clq"] = BuiltinFn("clq",builtinfnarglist_8)
 builtin_fns["mad_hi"] = BuiltinFn("mad_hi",builtinfnarglist_31)
 builtin_fns["mad_sat"] = BuiltinFn("mad_sat",builtinfnarglist_31)
 builtin_fns["max"] = BuiltinFn("max",builtinfnarglist_12)
-builtin_fns["max"].args.append(builtinfnarglist_123)
+builtin_fns["max"].signatures.append(builtinfnarglist_123)
 builtin_fns["min"] = BuiltinFn("min",builtinfnarglist_12)
-builtin_fns["min"].args.append(builtinfnarglist_123)
+builtin_fns["min"].signatures.append(builtinfnarglist_123)
 builtin_fns["mul_hi"] = BuiltinFn("mul_hi",builtinfnarglist_12)
 builtin_fns["rotate"] = BuiltinFn("rotate",builtinfnarglist_12)
 builtin_fns["subsat"] = BuiltinFn("subsat",builtinfnarglist_12)
 builtin_fns["upsample"] = BuiltinFn("upsample",builtinfnarglist_129)
-builtin_fns["upsample"].args.append(builtinfnarglist_130)
-builtin_fns["upsample"].args.append(builtinfnarglist_131)
-builtin_fns["upsample"].args.append(builtinfnarglist_132)
-builtin_fns["upsample"].args.append(builtinfnarglist_133)
-builtin_fns["upsample"].args.append(builtinfnarglist_134)
-builtin_fns["upsample"].args.append(builtinfnarglist_135)
-builtin_fns["upsample"].args.append(builtinfnarglist_136)
-builtin_fns["upsample"].args.append(builtinfnarglist_137)
-builtin_fns["upsample"].args.append(builtinfnarglist_138)
-builtin_fns["upsample"].args.append(builtinfnarglist_129)
-builtin_fns["upsample"].args.append(builtinfnarglist_130)
-builtin_fns["upsample"].args.append(builtinfnarglist_131)
-builtin_fns["upsample"].args.append(builtinfnarglist_132)
-builtin_fns["upsample"].args.append(builtinfnarglist_133)
-builtin_fns["upsample"].args.append(builtinfnarglist_134)
-builtin_fns["upsample"].args.append(builtinfnarglist_135)
-builtin_fns["upsample"].args.append(builtinfnarglist_136)
-builtin_fns["upsample"].args.append(builtinfnarglist_137)
-builtin_fns["upsample"].args.append(builtinfnarglist_138)
-builtin_fns["upsample"].args.append(builtinfnarglist_129)
-builtin_fns["upsample"].args.append(builtinfnarglist_130)
-builtin_fns["upsample"].args.append(builtinfnarglist_131)
-builtin_fns["upsample"].args.append(builtinfnarglist_132)
-builtin_fns["upsample"].args.append(builtinfnarglist_133)
-builtin_fns["upsample"].args.append(builtinfnarglist_134)
-builtin_fns["upsample"].args.append(builtinfnarglist_135)
-builtin_fns["upsample"].args.append(builtinfnarglist_136)
-builtin_fns["upsample"].args.append(builtinfnarglist_137)
-builtin_fns["upsample"].args.append(builtinfnarglist_138)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_130)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_131)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_132)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_133)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_134)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_135)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_136)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_137)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_138)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_129)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_130)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_131)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_132)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_133)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_134)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_135)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_136)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_137)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_138)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_129)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_130)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_131)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_132)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_133)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_134)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_135)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_136)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_137)
+builtin_fns["upsample"].signatures.append(builtinfnarglist_138)
 builtin_fns["mad24"] = BuiltinFn("mad24",builtinfnarglist_31)
 builtin_fns["mul24"] = BuiltinFn("mul24",builtinfnarglist_12)
-builtin_fns["clamp"].args.append(builtinfnarglist_31)
-builtin_fns["clamp"].args.append(builtinfnarglist_162)
+builtin_fns["clamp"].signatures.append(builtinfnarglist_31)
+builtin_fns["clamp"].signatures.append(builtinfnarglist_162)
 builtin_fns["degrees"] = BuiltinFn("degrees",builtinfnarglist_8)
-builtin_fns["max"].args.append(builtinfnarglist_12)
-builtin_fns["max"].args.append(builtinfnarglist_33)
-builtin_fns["min"].args.append(builtinfnarglist_12)
-builtin_fns["min"].args.append(builtinfnarglist_33)
+builtin_fns["max"].signatures.append(builtinfnarglist_12)
+builtin_fns["max"].signatures.append(builtinfnarglist_33)
+builtin_fns["min"].signatures.append(builtinfnarglist_12)
+builtin_fns["min"].signatures.append(builtinfnarglist_33)
 builtin_fns["mix"] = BuiltinFn("mix",builtinfnarglist_31)
-builtin_fns["mix"].args.append(builtinfnarglist_31)
+builtin_fns["mix"].signatures.append(builtinfnarglist_31)
 builtin_fns["randian"] = BuiltinFn("randian",builtinfnarglist_8)
 builtin_fns["step"] = BuiltinFn("step",builtinfnarglist_12)
-builtin_fns["step"].args.append(builtinfnarglist_172)
+builtin_fns["step"].signatures.append(builtinfnarglist_172)
 builtin_fns["smoothstep"] = BuiltinFn("smoothstep",builtinfnarglist_31)
 builtin_fns["smoothetype"] = BuiltinFn("smoothetype",builtinfnarglist_174)
 builtin_fns["sign"] = BuiltinFn("sign",builtinfnarglist_8)
 builtin_fns["cross"] = BuiltinFn("cross",builtinfnarglist_176)
-builtin_fns["cross"].args.append(builtinfnarglist_177)
+builtin_fns["cross"].signatures.append(builtinfnarglist_177)
 builtin_fns["dot"] = BuiltinFn("dot",builtinfnarglist_178)
-builtin_fns["dot"].args.append(builtinfnarglist_179)
-builtin_fns["dot"].args.append(builtinfnarglist_180)
-builtin_fns["dot"].args.append(builtinfnarglist_181)
+builtin_fns["dot"].signatures.append(builtinfnarglist_179)
+builtin_fns["dot"].signatures.append(builtinfnarglist_180)
+builtin_fns["dot"].signatures.append(builtinfnarglist_181)
 builtin_fns["distance"] = BuiltinFn("distance",builtinfnarglist_178)
-builtin_fns["distance"].args.append(builtinfnarglist_183)
-builtin_fns["distance"].args.append(builtinfnarglist_177)
-builtin_fns["distance"].args.append(builtinfnarglist_176)
+builtin_fns["distance"].signatures.append(builtinfnarglist_183)
+builtin_fns["distance"].signatures.append(builtinfnarglist_177)
+builtin_fns["distance"].signatures.append(builtinfnarglist_176)
 builtin_fns["length"] = BuiltinFn("length",builtinfnarglist_186)
-builtin_fns["length"].args.append(builtinfnarglist_187)
-builtin_fns["length"].args.append(builtinfnarglist_188)
-builtin_fns["length"].args.append(builtinfnarglist_189)
+builtin_fns["length"].signatures.append(builtinfnarglist_187)
+builtin_fns["length"].signatures.append(builtinfnarglist_188)
+builtin_fns["length"].signatures.append(builtinfnarglist_189)
 builtin_fns["normalize"] = BuiltinFn("normalize",builtinfnarglist_186)
-builtin_fns["normalize"].args.append(builtinfnarglist_187)
-builtin_fns["normalize"].args.append(builtinfnarglist_188)
-builtin_fns["normalize"].args.append(builtinfnarglist_189)
+builtin_fns["normalize"].signatures.append(builtinfnarglist_187)
+builtin_fns["normalize"].signatures.append(builtinfnarglist_188)
+builtin_fns["normalize"].signatures.append(builtinfnarglist_189)
 builtin_fns["fast_distance"] = BuiltinFn("fast_distance",builtinfnarglist_186)
-builtin_fns["fast_distance"].args.append(builtinfnarglist_187)
-builtin_fns["fast_distance"].args.append(builtinfnarglist_188)
-builtin_fns["fast_distance"].args.append(builtinfnarglist_189)
+builtin_fns["fast_distance"].signatures.append(builtinfnarglist_187)
+builtin_fns["fast_distance"].signatures.append(builtinfnarglist_188)
+builtin_fns["fast_distance"].signatures.append(builtinfnarglist_189)
 builtin_fns["fast_length"] = BuiltinFn("fast_length",builtinfnarglist_186)
-builtin_fns["fast_length"].args.append(builtinfnarglist_187)
-builtin_fns["fast_length"].args.append(builtinfnarglist_188)
-builtin_fns["fast_length"].args.append(builtinfnarglist_189)
+builtin_fns["fast_length"].signatures.append(builtinfnarglist_187)
+builtin_fns["fast_length"].signatures.append(builtinfnarglist_188)
+builtin_fns["fast_length"].signatures.append(builtinfnarglist_189)
 builtin_fns["fast_normalize"] = BuiltinFn("fast_normalize",builtinfnarglist_186)
-builtin_fns["fast_normalize"].args.append(builtinfnarglist_187)
-builtin_fns["fast_normalize"].args.append(builtinfnarglist_188)
-builtin_fns["fast_normalize"].args.append(builtinfnarglist_189)
+builtin_fns["fast_normalize"].signatures.append(builtinfnarglist_187)
+builtin_fns["fast_normalize"].signatures.append(builtinfnarglist_188)
+builtin_fns["fast_normalize"].signatures.append(builtinfnarglist_189)
 builtin_fns["isequal"] = BuiltinFn("isequal",builtinfnarglist_206)
-builtin_fns["isequal"].args.append(builtinfnarglist_207)
-builtin_fns["isequal"].args.append(builtinfnarglist_208)
-builtin_fns["isequal"].args.append(builtinfnarglist_209)
+builtin_fns["isequal"].signatures.append(builtinfnarglist_207)
+builtin_fns["isequal"].signatures.append(builtinfnarglist_208)
+builtin_fns["isequal"].signatures.append(builtinfnarglist_209)
 builtin_fns["isnotequal"] = BuiltinFn("isnotequal",builtinfnarglist_210)
-builtin_fns["isnotequal"].args.append(builtinfnarglist_206)
-builtin_fns["isnotequal"].args.append(builtinfnarglist_207)
-builtin_fns["isnotequal"].args.append(builtinfnarglist_208)
-builtin_fns["isnotequal"].args.append(builtinfnarglist_209)
-builtin_fns["isnotequal"].args.append(builtinfnarglist_210)
+builtin_fns["isnotequal"].signatures.append(builtinfnarglist_206)
+builtin_fns["isnotequal"].signatures.append(builtinfnarglist_207)
+builtin_fns["isnotequal"].signatures.append(builtinfnarglist_208)
+builtin_fns["isnotequal"].signatures.append(builtinfnarglist_209)
+builtin_fns["isnotequal"].signatures.append(builtinfnarglist_210)
 builtin_fns["isgreaterequal"] = BuiltinFn("isgreaterequal",builtinfnarglist_206)
-builtin_fns["isgreaterequal"].args.append(builtinfnarglist_207)
-builtin_fns["isgreaterequal"].args.append(builtinfnarglist_208)
-builtin_fns["isgreaterequal"].args.append(builtinfnarglist_209)
-builtin_fns["isgreaterequal"].args.append(builtinfnarglist_210)
+builtin_fns["isgreaterequal"].signatures.append(builtinfnarglist_207)
+builtin_fns["isgreaterequal"].signatures.append(builtinfnarglist_208)
+builtin_fns["isgreaterequal"].signatures.append(builtinfnarglist_209)
+builtin_fns["isgreaterequal"].signatures.append(builtinfnarglist_210)
 builtin_fns["isless"] = BuiltinFn("isless",builtinfnarglist_206)
-builtin_fns["isless"].args.append(builtinfnarglist_207)
-builtin_fns["isless"].args.append(builtinfnarglist_208)
-builtin_fns["isless"].args.append(builtinfnarglist_209)
-builtin_fns["isless"].args.append(builtinfnarglist_210)
+builtin_fns["isless"].signatures.append(builtinfnarglist_207)
+builtin_fns["isless"].signatures.append(builtinfnarglist_208)
+builtin_fns["isless"].signatures.append(builtinfnarglist_209)
+builtin_fns["isless"].signatures.append(builtinfnarglist_210)
 builtin_fns["islessequal"] = BuiltinFn("islessequal",builtinfnarglist_206)
-builtin_fns["islessequal"].args.append(builtinfnarglist_207)
-builtin_fns["islessequal"].args.append(builtinfnarglist_208)
-builtin_fns["islessequal"].args.append(builtinfnarglist_209)
-builtin_fns["islessequal"].args.append(builtinfnarglist_210)
+builtin_fns["islessequal"].signatures.append(builtinfnarglist_207)
+builtin_fns["islessequal"].signatures.append(builtinfnarglist_208)
+builtin_fns["islessequal"].signatures.append(builtinfnarglist_209)
+builtin_fns["islessequal"].signatures.append(builtinfnarglist_210)
 builtin_fns["isfinite"] = BuiltinFn("isfinite",builtinfnarglist_186)
-builtin_fns["isfinite"].args.append(builtinfnarglist_187)
-builtin_fns["isfinite"].args.append(builtinfnarglist_189)
-builtin_fns["isfinite"].args.append(builtinfnarglist_234)
-builtin_fns["isfinite"].args.append(builtinfnarglist_235)
+builtin_fns["isfinite"].signatures.append(builtinfnarglist_187)
+builtin_fns["isfinite"].signatures.append(builtinfnarglist_189)
+builtin_fns["isfinite"].signatures.append(builtinfnarglist_234)
+builtin_fns["isfinite"].signatures.append(builtinfnarglist_235)
 builtin_fns["isinf"] = BuiltinFn("isinf",builtinfnarglist_186)
-builtin_fns["isinf"].args.append(builtinfnarglist_187)
-builtin_fns["isinf"].args.append(builtinfnarglist_189)
-builtin_fns["isinf"].args.append(builtinfnarglist_234)
-builtin_fns["isinf"].args.append(builtinfnarglist_235)
+builtin_fns["isinf"].signatures.append(builtinfnarglist_187)
+builtin_fns["isinf"].signatures.append(builtinfnarglist_189)
+builtin_fns["isinf"].signatures.append(builtinfnarglist_234)
+builtin_fns["isinf"].signatures.append(builtinfnarglist_235)
 builtin_fns["isnan"] = BuiltinFn("isnan",builtinfnarglist_186)
-builtin_fns["isnan"].args.append(builtinfnarglist_187)
-builtin_fns["isnan"].args.append(builtinfnarglist_189)
-builtin_fns["isnan"].args.append(builtinfnarglist_234)
-builtin_fns["isnan"].args.append(builtinfnarglist_235)
+builtin_fns["isnan"].signatures.append(builtinfnarglist_187)
+builtin_fns["isnan"].signatures.append(builtinfnarglist_189)
+builtin_fns["isnan"].signatures.append(builtinfnarglist_234)
+builtin_fns["isnan"].signatures.append(builtinfnarglist_235)
 builtin_fns["isnormal"] = BuiltinFn("isnormal",builtinfnarglist_186)
-builtin_fns["isnormal"].args.append(builtinfnarglist_187)
-builtin_fns["isnormal"].args.append(builtinfnarglist_189)
-builtin_fns["isnormal"].args.append(builtinfnarglist_234)
-builtin_fns["isnormal"].args.append(builtinfnarglist_235)
+builtin_fns["isnormal"].signatures.append(builtinfnarglist_187)
+builtin_fns["isnormal"].signatures.append(builtinfnarglist_189)
+builtin_fns["isnormal"].signatures.append(builtinfnarglist_234)
+builtin_fns["isnormal"].signatures.append(builtinfnarglist_235)
 builtin_fns["isordered"] = BuiltinFn("isordered",builtinfnarglist_178)
-builtin_fns["isordered"].args.append(builtinfnarglist_183)
-builtin_fns["isordered"].args.append(builtinfnarglist_176)
-builtin_fns["isordered"].args.append(builtinfnarglist_254)
-builtin_fns["isordered"].args.append(builtinfnarglist_255)
+builtin_fns["isordered"].signatures.append(builtinfnarglist_183)
+builtin_fns["isordered"].signatures.append(builtinfnarglist_176)
+builtin_fns["isordered"].signatures.append(builtinfnarglist_254)
+builtin_fns["isordered"].signatures.append(builtinfnarglist_255)
 builtin_fns["signbit"] = BuiltinFn("signbit",builtinfnarglist_38)
-builtin_fns["signbit"].args.append(builtinfnarglist_257)
-builtin_fns["signbit"].args.append(builtinfnarglist_258)
-builtin_fns["signbit"].args.append(builtinfnarglist_259)
-builtin_fns["signbit"].args.append(builtinfnarglist_260)
+builtin_fns["signbit"].signatures.append(builtinfnarglist_257)
+builtin_fns["signbit"].signatures.append(builtinfnarglist_258)
+builtin_fns["signbit"].signatures.append(builtinfnarglist_259)
+builtin_fns["signbit"].signatures.append(builtinfnarglist_260)
 builtin_fns["any"] = BuiltinFn("any",builtinfnarglist_8)
 builtin_fns["all"] = BuiltinFn("all",builtinfnarglist_8)
 builtin_fns["bitselect"] = BuiltinFn("bitselect",builtinfnarglist_31)
@@ -1021,6 +1027,8 @@ builtin_fns["vload_half2"] = BuiltinFn("vload_half2",builtinfnarglist_273)
 builtin_fns["vload_half4"] = BuiltinFn("vload_half4",builtinfnarglist_273)
 builtin_fns["vload_half8"] = BuiltinFn("vload_half8",builtinfnarglist_273)
 builtin_fns["vload_half16"] = BuiltinFn("vload_half16",builtinfnarglist_273)
+### END GENERATED CODE ###
+
 ### END GENERATED CODE ###
 
 ################################################################################
@@ -1162,6 +1170,9 @@ class TypeDefinitions(object):
         if rhs.name == "string" and lhs.name == "char":
             return lhs.is_ptr or lhs.is_array
 
+    def _is_ptr(self, t):
+        return t.is_array or t.is_ptr
+
     def sub(self, lhs, rhs):
         """Returns true if lhs and be used where rhs is expected."""
         if not isinstance(lhs, Type): 
@@ -1171,14 +1182,24 @@ class TypeDefinitions(object):
             raise TargetTypeCheckException("Expected Type instance but got %s" %
                                            rhs.__class__, None)
         
-        if not self.matching_quals(lhs, rhs):
-            return False
-        
+        #char* and string considered the same here.
         if self._sub_str_char(lhs,rhs):
             return True
-        if lhs.name == rhs.name: 
+        
+        if self._is_ptr(lhs) and self._is_ptr(rhs):
             return True
-        if transitive_sub(lhs.name, rhs.name): 
+        elif self._is_ptr(lhs):
+            if transitive_sub("int", rhs.name):
+                return True
+            raise TargetTypeCheckException("Cannot operate on a ptr and" + 
+                                           "a non-ptr.", None)
+        elif self._is_ptr(rhs):
+            if transitive_sub("int", lhs.name):
+                return True
+            raise TargetTypeCheckException("Cannot operate on a ptr and" + 
+                                           "a non-ptr.", None)
+        
+        if lhs.name == rhs.name or transitive_sub(lhs.name, rhs.name):
             return True
         
         return False
@@ -1280,7 +1301,7 @@ class Type(object):
         return True
 
     def __str__(self):
-        name = "Type:"
+        name = "Type: %s " % self.name
         for q in self.quals:
             name = name + "%s " % q
         for s in self.storage:
@@ -1289,7 +1310,8 @@ class Type(object):
             name = name + "%s " % f
         if self.is_array:
             name = name + "[%s] " % self.dim
-        name = name + "%s" % self.name
+        if self.is_ptr:
+            name = name + "*"
         return name
             
 class StructType(Type):
@@ -1742,7 +1764,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                 t = self.visit(param)
                 param_names.append(t.declared_name)
                 param_types.append(t)
-        
+
         # Create the function type
         func_t = FunctionType(function_name, param_types, return_type)
         
@@ -1766,23 +1788,26 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
 
     def visit_FuncDef(self, node):
         """Function body definition."""
-        function_t = self.visit(node.decl)
-        
-        param_names = [t.declared_name for t in function_t.param_types]
-        param_types = [t for t in function_t.param_types]
-               
         # Create a new scope for the function defintion.
         self._g.change_scope()
         
-        # Add params to the function's scope
-        for n,t in zip(param_names,param_types):
-            self._g.add_variable(n, t, node)
+        function_t = self.visit(node.decl)
+        
+#        param_names = [t.declared_name for t in function_t.param_types]
+#        param_types = [t for t in function_t.param_types]
+        
+#        # Add params to the function's scope
+#        for n,t in zip(param_names,param_types):
+#            self._g.add_variable(n, t, node)
             
         # Visit expressions in the body of the function.
         self.visit(node.body)
         
         # Move out of the function definition scope.
         self._g.leave_scope()
+        
+        #Add the function to the surrounding scope.
+        self._g.add_variable(function_t.name, function_t, node)
         
         return function_t
     
@@ -1892,11 +1917,18 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                         "Type %s expected dimension %s but initialized to %s"%
                             (str(type),str(type.dim),len(initial_value_type)),
                             node)
+                    
+                    was_array = type.is_array 
+                    type.is_array = False
+                    was_ptr = type.is_ptr
+                    type.is_ptr   = False
                     for t in initial_value_type:
                         if not self._g.type_defs.sub(t, type):
                             raise TargetTypeCheckException(
                             "Wrong type in initializer for %s"%str(type),node)
-
+                    type.is_array = was_array
+                    type.is_ptr = was_ptr
+                    
                 elif isinstance(type, StructType):
                     if len(initial_value_type) > len(type.members.values()):
                         raise TargetTypeCheckException(

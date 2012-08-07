@@ -12,8 +12,8 @@ OpenCL.include("<stdio.h>")
 
 @clq.fn
 def plus(a, b):
-    c = a + b
     c = "asdf"
+    c = a+b
 
 #plus_ii = plus.compile(OpenCL, lang.ConstrainedString(OpenCL, ".+"), 
 #                               lang.ConstrainedString(OpenCL, "."))

@@ -9,6 +9,7 @@ import clq
 from clq import TypeResolutionError, CodeGenerationError
 from clq.backends.opencl.correspondence import TypeCorrespondence 
 import pycparserext.typechecker.type_checker as type_checker
+import types
 
 class Backend(clq.Backend):
     """A backend that centralizes logic common to C-based languages."""
@@ -29,44 +30,44 @@ class Backend(clq.Backend):
     ## Generating Program Items
     ######################################################################
     
-    def _get_ast_from_expr(self, context, expr):
-        """Returns an AST node containing expr."""
+    def _get_ast_from_expr(self, node_code):
+        """Returns an AST node containing node's code."""
         g = cg.CG()
-        g.append(expr.generated_code)
+        g.append(node_code)
         g.append(";")
         code = "void dummy_func() { %s } " % g.code
         ast = self.get_tdc_checker().get_ast(code)
         return ast.ext[0].body.block_items[0] #extract expr from ast.
     
     def verify_correspondence(self, context, tdc_context):
-        #TODO throw one error for a typechecking failure and a different error
-        #for a correspondence failure.
-        corr = TypeCorrespondence()
-          
-        for expr in context.expressions:
-            g = cg.CG()
-            g.append(expr.generated_code)
-            g.append(";")
-            ast_node = self._get_ast_from_expr(context, expr)
+        """Checks that all self.expressions match their expected types."""
+        for node in context.expressions:
+            #For statements, add to context and move on.
+            if isinstance(node, types.StringType):
+                print "bare code: " + node
+                ast_node = self._get_ast_from_expr(node)
+                self.get_tdc_checker().check_ast(ast_node, tdc_context)
+                continue
             
-#            print ("" if expr.is_expr else "not ") + "checking " + g.code
-            
-            if expr.is_expr: 
+            #For expressions, check correspondence.
+            print node.code
+            ast_node = self._get_ast_from_expr(node.code)
+            try:
+                #The correspondence check.
+                expected_type = TypeCorrespondence().ace_to_tc(node.clq_type)
+                result_type = self.get_tdc_checker().check_ast(ast_node, 
+                                                               tdc_context)
                 try:
-                    #The correspondence check.
-                    expected_type = corr.ace_to_tc(expr.expected_ace_type)
-                    result_type = self.get_tdc_checker().check_ast(ast_node, 
-                                                                   tdc_context)
-                    try:
-                        tdc_context.type_defs.sub(expected_type, result_type)
-                    except Exception as ex:
-                        #Correspondence failure.
-                        raise Exception("Found %s where %s was expected" %
-                                        (expected_type,result_type))
+                    tdc_context.type_defs.sub(expected_type, result_type)
                 except Exception as ex:
-                    #Typechecking failure.
-                    print "Failed at %s with: %s" % (g.code,ex.message)
-                    raise ex
+                    #Correspondence failure.
+                    raise Exception("Found %s where %s was expected" %
+                                    (result_type,expected_type))
+            except Exception as ex:
+                #Typechecking failure.
+                print "Failed type correspondence check at ``%s'' with: %s" % \
+                      (node.code, ex.message)
+                raise ex
     
     def generate_program_item(self, context):
         #Context used for correspdonece check.
@@ -118,17 +119,15 @@ class Backend(clq.Backend):
         # TODO: proper namespacing
         return context.concrete_fn.generic_fn.name
     
+    def _generate_declaration(self,id,type):
+        return type.name + " " + id  + ";"
+     
     def _add_declaration(self, context, id, type):
-        decl = type.name + " " + id + ";"
+        decl = self._generate_declaration(id,type)
         decls = context.declarations
         if decl not in decls:
-            e = clq.Expression()
-            e.is_expr = False #declaration
-            e.generated_code = decl
-            context.expressions.append(e)
-            decls.append(decl)
-            
-        
+            context.expressions.append(decl)
+            decls.append(decl)            
                 
     ######################################################################
     ## Types
@@ -366,18 +365,16 @@ class Type(clq.Type):
         context.stmts.append((self.generate_Assign_stmt(target.code, 
                                                         value.code), 
                               context.end_stmt))
-
+        
         stmt = context.stmts.pop()
-        e = clq.Expression()
-        e.is_expr = False
-        e.generated_code = stmt
-        context.expressions.append(e)
         context.stmts.append(stmt)
         
         context.body.append(astx.copy_node(node,
             targets=[target],
             value=value
         ))
+        
+        return stmt
                 
     @classmethod
     def generate_Assign_stmt(cls, target_code, value_code):
@@ -504,11 +501,6 @@ class ScalarType(Type):
         op = context.visit(node.ops[0])
         
         code = (left.code, " ", op.code, " ", right.code)
-         
-        e = clq.Expression()
-        e.generated_code = code
-        e.set_expected_type(self.resolve_Compare(context, node))
-        context.expressions.append(e)
         
         
         return astx.copy_node(node,
@@ -591,12 +583,7 @@ class IntegerType(ScalarType):
         operand = context.visit(node.operand)
         
         code = ("(", op.code, "(", operand.code, "))")
-        
-        e = clq.Expression()
-        e.generated_code = code
-        e.expected_ace_type = self.resolve_UnaryOp(context, node)
-        context.expressions.append(e)
-        
+    
         return astx.copy_node(node,
             op=op,
             operand=operand,
@@ -659,11 +646,6 @@ class IntegerType(ScalarType):
         right = context.visit(node.right)
         
         code = ("(", left.code, " ", op.code, " ", right.code, ")")
-        
-        e = clq.Expression()
-        e.generated_code = code
-        e.expected_ace_type = self.resolve_BinOp(context, node)
-        context.expressions.append(e)
         
         return astx.copy_node(node,
             left=left,
@@ -766,12 +748,7 @@ class FloatType(ScalarType):
         operand = context.visit(node.operand)
         
         code = ("(", op.code, operand.code, ")")
-        
-        e = clq.Expression()
-        e.generated_code = code
-        e.expected_ace_type = self.resolve_UnaryOp(context, node)
-        context.expressions.append(e)
-        
+
         return astx.copy_node(node,
             op=op,
             operand=operand,

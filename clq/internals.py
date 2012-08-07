@@ -819,8 +819,15 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         )
         
     def visit_arguments(self, node):
+        args = [self.visit(arg) for arg in node.args]
+        
+        #Create a statement for each of the arguments. 
+        for arg in args:
+            code = self.backend._generate_declaration(arg.id,arg.clq_type)
+            self.context.expressions.append(code)
+
         return _ast.arguments(
-            args=[self.visit(arg) for arg in node.args],
+            args=args,
             vararg=None,
             kwarg=None,
             defaults=[]
@@ -839,7 +846,11 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         if isinstance(target, _ast.Name):
             target_type = target.unresolved_type.resolve(context)
             target_type.validate_Assign(context, node)
-            target_type.generate_Assign(context, node)
+            generated_code = target_type.generate_Assign(context, node)
+            
+            node.code = generated_code
+            node.clq_type = target_type
+            context.expressions.append(node)
         elif isinstance(target, _ast.Attribute):
             value_type = target.value.unresolved_type.resolve(context)
             value_type.validate_AssignAttribute(context, node)
@@ -944,6 +955,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         operand_type = node.operand.unresolved_type.resolve(context)
         new = operand_type.generate_UnaryOp(context, node)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_BinOp(self, node):
@@ -952,6 +964,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         left_type = node.left.unresolved_type.resolve(context)
         new = left_type.generate_BinOp(context, node)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_Compare(self, node):
@@ -960,6 +973,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         left_type = node.left.unresolved_type.resolve(context)
         new = left_type.generate_Compare(context, node)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_BoolOp(self, node):
@@ -968,6 +982,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         left_type = node.values[0].unresolved_type.resolve(context)
         new = left_type.generate_BoolOp(context, node)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
             
     ######################################################################
@@ -978,6 +993,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = context.backend.generate_IfExp(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        print new.code
         return new
     
     def visit_Call(self, node):
@@ -1014,10 +1030,11 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         
     def visit_Name(self, node):
         context = self.context
-        return astx.copy_node(node,
+        new = astx.copy_node(node,
             code=node.id,
             clq_type=context.observe(node.unresolved_type.resolve(context), node)
         )
+        return new
         
     def visit_Num(self, node):
         context = self.context

@@ -546,22 +546,6 @@ class Backend(object):
         raise CodeGenerationError(
             "Backend does not support operators.", node)
 
-
-class Expression(object):
-    """An expression for the correspondence check."""
-    def __init__(self):
-            self.generated_code = None
-            self.expected_ace_type = None
-            self.push_ctx = False
-            self.pop_ctx = False
-            self.is_expr = True
-
-    def set_expected_type(self, type):
-        if type == None:
-            self.is_expr = False
-        else:
-            self.expected_ace_type = type
-
 class Context(object):
     """Contains contextual information that is used during type resolution 
     and code generation. 
@@ -580,7 +564,9 @@ class Context(object):
         self.stmts = [ ]
         self.program_items = cypy.SetList()
         
-        self.expressions = list() # Of Expressions
+        # List of generated expressio nodes. Also may contain strings, which
+        # are statements that should be added to the correspondence check ctx.
+        self.expressions = [] 
                 
         # used to provide base case for resolving multiple assignments
         self._resolving_name = None

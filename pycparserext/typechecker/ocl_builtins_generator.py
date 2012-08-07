@@ -13,6 +13,7 @@ class ParserException(Exception):
         self.message = msg
 
 class Param(object):
+    """A single parameter in a signature."""
     def __init__(self, p):
         """Parses a type_checker.Type out of a line in ocl_functions.txt"""
         ret = Type("")
@@ -148,7 +149,7 @@ class OclFunctionLine(object):
                      self.name,
                      self.param_list.var_name())
         else:             
-            print "builtin_fns[\"%s\"].args.append(%s)" % \
+            print "builtin_fns[\"%s\"].signatures.append(%s)" % \
                     (self.name, 
                      self.param_list.var_name())
 
