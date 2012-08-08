@@ -11,7 +11,7 @@ def plus(a, b):
 
 @clq.fn
 def plus3(a, b, c, plus):
-    return plus(plus(a, b), c) + c + 1
+    return plus(plus(a,b),c) + c + 1
 
 plus3_ii = plus3.compile(OpenCL, ocl.int, ocl.int, ocl.int, plus.cl_type)
 

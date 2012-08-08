@@ -92,12 +92,6 @@ class ConstrainedString(clq.Type):
     def generate_BinOp(self,context,node):
         node = self._backend.string_type()(
                 self._backend.string_t).generate_BinOp(context,node)
-
-        e = clq.Expression()
-        e.generated_code = node.code
-        e.set_expected_type(self.resolve_BinOp(context, node))
-        context.expressions.append(e)
-        
         return node
     def resolve_Return(self,context,node):
         return self._backend.string_type()(

@@ -30,27 +30,32 @@ class Backend(clq.Backend):
     ## Generating Program Items
     ######################################################################
     
+    def _get_readable_code(self, code):
+        g = cg.CG()
+        g.append(code)
+        g.append(";")
+        return g.code
+
     def _get_ast_from_expr(self, node_code):
         """Returns an AST node containing node's code."""
-        g = cg.CG()
-        g.append(node_code)
-        g.append(";")
-        code = "void dummy_func() { %s } " % g.code
+        code = "void dummy_func() { %s } " % self._get_readable_code(node_code)
         ast = self.get_tdc_checker().get_ast(code)
         return ast.ext[0].body.block_items[0] #extract expr from ast.
     
     def verify_correspondence(self, context, tdc_context):
         """Checks that all self.expressions match their expected types."""
         for node in context.expressions:
+            if not isinstance(node, types.StringType):
+                print self._get_readable_code(node.code)
+            continue
+        
             #For statements, add to context and move on.
             if isinstance(node, types.StringType):
-                print "bare code: " + node
-                ast_node = self._get_ast_from_expr(node)
+                ast_node = self._get_ast_from_expr(node.code)
                 self.get_tdc_checker().check_ast(ast_node, tdc_context)
                 continue
             
             #For expressions, check correspondence.
-            print node.code
             ast_node = self._get_ast_from_expr(node.code)
             try:
                 #The correspondence check.
@@ -66,28 +71,33 @@ class Backend(clq.Backend):
             except Exception as ex:
                 #Typechecking failure.
                 print "Failed type correspondence check at ``%s'' with: %s" % \
-                      (node.code, ex.message)
+                      (self._get_readable_code(node.code), ex.message)
                 raise ex
     
     def generate_program_item(self, context):
+        print "Generating: " + self._generate_name(context)
+        for f in self.get_tdc_context().functions:
+            print "\t%s" % f
+        
+        
         #Context used for correspdonece check.
-        tdc_context = type_checker.Context()
+        tdc_context = self.get_tdc_context()
+        tdc_context.change_scope()
         
-        g = cg.CG()
-        
-        #TODO save this work for later.
         #Handle includes.
+        g = cg.CG()
         for include in self.includes:
             g.append("#include %s\n" % include)
-#        self.includes = list()
         g.append("\n")
+        self.includes = []
         
         #Add includes to correspondence check context
         self.get_tdc_checker().check(g.code, tdc_context)
 
         #Correspondence check
-        self.verify_correspondence(context, tdc_context)
+        self.verify_correspondence(context, tdc_context)    
         
+        tdc_context.leave_scope()
         
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
@@ -100,11 +110,14 @@ class Backend(clq.Backend):
         g.append((context.untab, "\n}\n"))
         
         try:
+            #Add this function to the surrounding scope and generate a return
+            #type.
             self.get_tdc_checker().check(g.code, self.get_tdc_context())
             return_tc_type = self.get_tdc_context().get_function(name)
         except Exception as e:
-            print e.message
-            raise CodeGenerationError(e.message, None)
+            print "Error `%s' raised from generated code %s" % (str(e.message), str(g.code))
+            raise CodeGenerationError("Error `%s' raised from generated code %s" %
+                                      (str(e.message), str(g.code)), None)
         
         return clq.ProgramItem(name, g.code)
         

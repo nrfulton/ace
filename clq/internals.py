@@ -3,7 +3,8 @@ import ast as _ast # http://docs.python.org/library/ast.html
 import cypy
 import cypy.astx as astx
 
-from clq import (InvalidOperationError, TypeResolutionError, Context)
+from clq import (InvalidOperationError, TypeResolutionError, 
+                 Context, ConcreteFnType, GenericFnType)
 
 class GenericFnVisitor(_ast.NodeVisitor):
     """A visitor that produces a copy of a generic function's abstract syntax 
@@ -823,8 +824,12 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         
         #Create a statement for each of the arguments. 
         for arg in args:
-            code = self.backend._generate_declaration(arg.id,arg.clq_type)
-            self.context.expressions.append(code)
+            if not isinstance(arg.clq_type, GenericFnType) \
+            and not isinstance(arg.clq_type, ConcreteFnType):
+                
+                print arg.id + ":" + str(arg.clq_type.__class__)
+                code = self.backend._generate_declaration(arg.id,arg.clq_type)
+                self.context.expressions.append(code)
 
         return _ast.arguments(
             args=args,
@@ -993,7 +998,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = context.backend.generate_IfExp(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
-        print new.code
+        context.expressions.append(new)
         return new
     
     def visit_Call(self, node):
@@ -1002,6 +1007,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = func_type.generate_Call(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_Attribute(self, node):
@@ -1010,6 +1016,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = value_type.generate_Attribute(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_Subscript(self, node):
@@ -1018,6 +1025,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = value_type.generate_Subscript(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_Index(self, node):
@@ -1041,6 +1049,7 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = context.backend.generate_Num(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new
     
     def visit_Str(self, node):
@@ -1048,4 +1057,5 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         new = context.backend.generate_Str(context, node)
         clq_type = node.unresolved_type.resolve(context)
         new.clq_type = context.observe(clq_type, node)
+        context.expressions.append(new)
         return new

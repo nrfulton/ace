@@ -77,8 +77,8 @@ sub_type   = lang.ConstrainedString(OpenCL, "a")
 @clq.fn
 def return_sub(x):
     return x
-return_sub = return_sub.compile(OpenCL, sub_type)
-assert return_sub.return_type == sub_type
+return_subc = return_sub.compile(OpenCL, sub_type)
+assert return_subc.return_type == sub_type
 
 @clq.fn
 def assign_to_sub(x,y):

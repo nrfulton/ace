@@ -120,7 +120,9 @@ class CG(object):
                 if code is not None and code is not self:
                     self.append(code)
             elif cypy.is_iterable(code):
-                for item in code:
+                for item in code: 
+                    if item.__class__.__name__ == 'generator':
+                        print "here"
                     self.append(item)
             else:
                 self.append(self._convert(code))

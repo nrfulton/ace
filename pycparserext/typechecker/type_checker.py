@@ -1488,6 +1488,8 @@ class Variable(object):
         if self.type.has_key(scope):
             self.type.pop(scope)
 
+    def __str__(self):
+        return "%s : %s" % (self.name, str(self.type))
 
 ################################################################################
 #                                 CONEXT                                       #
@@ -1855,8 +1857,11 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         and (not func_type.has_ellipsis() \
              or len(param_types) < len(func_type.param_types)-1):        
             raise TargetTypeCheckException(
-                    "Wrong number of arguments passed to %s" %
-                    (str(func_type)), node)
+                    "%s arguments passed to %s, but expected %s" %
+                    (len(param_types), 
+                     str(func_type), 
+                     len(func_type.param_types)
+                    ), node)
         
         # Ensure that parameter types match declared parameter types.
         #Because zip uses  the smallest list, 
