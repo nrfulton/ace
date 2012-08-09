@@ -1,11 +1,12 @@
 #Generates code for OCL built-in types.
 
 from type_checker import Type
-from type_checker import GENTYPES
-from type_checker import SGENTYPES
-from type_checker import UGENTYPES
-from type_checker import IGENTYPES
-from type_checker import GENTYPE_SIZES
+from pycparserext.typechecker import GENTYPES
+from pycparserext.typechecker import GENTYPES
+from pycparserext.typechecker import SGENTYPES
+from pycparserext.typechecker import UGENTYPES
+from pycparserext.typechecker import IGENTYPES
+from pycparserext.typechecker import GENTYPE_SIZES
 import cypy
 
 class ParserException(Exception):

@@ -8,7 +8,7 @@ import copy
 import clq
 from clq import TypeResolutionError, CodeGenerationError
 from clq.backends.opencl.correspondence import TypeCorrespondence 
-import pycparserext.typechecker.type_checker as type_checker
+import pycparserext.typechecker as type_checker
 import types
 
 class Backend(clq.Backend):
