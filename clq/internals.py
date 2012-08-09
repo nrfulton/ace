@@ -826,8 +826,6 @@ class ConcreteFnVisitor(_ast.NodeVisitor):
         for arg in args:
             if not isinstance(arg.clq_type, GenericFnType) \
             and not isinstance(arg.clq_type, ConcreteFnType):
-                
-                print arg.id + ":" + str(arg.clq_type.__class__)
                 code = self.backend._generate_declaration(arg.id,arg.clq_type)
                 self.context.expressions.append(code)
 

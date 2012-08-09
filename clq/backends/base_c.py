@@ -72,8 +72,6 @@ class Backend(clq.Backend):
                 raise ex
     
     def generate_program_item(self, context):
-        print self._generate_name(context)
-        
         #Add any new includes to the context.
         include_code = ""
         for include in self.includes:
