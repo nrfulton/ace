@@ -5,10 +5,11 @@ import cypy.astx as astx
 import cypy.cg as cg
 import clq
 from clq import TypeResolutionError, CodeGenerationError
-from clq.backends.opencl.correspondence import TypeCorrespondence 
-import pycparserext.typechecker
+from clq.backends.opencl.correspondence import TypeCorrespondence
+from pycparserext.typechecker import TypeChecker
 from pycparser.plyparser import ParseError
 import types
+import traceback
 
 class Backend(clq.Backend):
     """A backend that centralizes logic common to C-based languages."""
@@ -80,49 +81,54 @@ class Backend(clq.Backend):
             for include in self.includes:
                 include_code = "%s#include %s" % (include_code, include)
             include_code = "%s\n" % include_code
-            self.includes = []
+            
         
         if self.correspondence_check:
             #Correspondence check in an isolated scope.
             tdc_context = self.get_tdc_context()
             tdc_context.change_scope()
-            
-            for function in tdc_context.functions:
-                print function.name
-            print "--"
-        
+
             #Check included code.
             if not include_code == None:
-                self.get_tdc_checker().check(include_code, tdc_context)
-
+                self.get_tdc_checker().check(include_code, tdc_context)            
             self.verify_correspondence(context, tdc_context)    
             tdc_context.leave_scope()
         
         #Generate the function's code.
         name = self._generate_name(context)
         g = cg.CG()
-        if not include_code == None: g.append(include_code)
+        include_code = None
+        if len(self.includes) > 0:
+            include_code = ""
+            for include in self.includes:
+                include_code = "%s#include %s" % (include_code, include)
+            include_code = "%s\n" % include_code
+        if not include_code == None: 
+            g.append(include_code)
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
         
         g.append((" ", name, "("))
-        g.append(cypy.join(self._yield_arg_str(context), ", "))
+        g.append(cypy.join.ed(self._yield_arg_str(context), ", "))
         g.append((") {\n", context.tab))
-        g.append((cypy.join(context.declarations, "\n"), "\n\n"))
+        g.append((cypy.join.ed(context.declarations, "\n"), "\n\n"))
         g.append(context.stmts)
         g.append((context.untab, "\n}\n"))
         
         if self.correspondence_check:
             try:
+                
                 #Add this function to the surrounding scope and generate a return
                 #type.
                 self.get_tdc_checker().check(g.code, self.get_tdc_context())
                 return_tc_type = self.get_tdc_context().get_function(name)
             except Exception as e:
                 print "Error `%s' raised from generated code %s" % (str(e.message), str(g.code))
+                traceback.print_exc()
                 raise CodeGenerationError("Error `%s' raised from generated code %s" %
                                           (str(e.message), str(g.code)), None)
         
+        self.includes = []
         return clq.ProgramItem(name, g.code)
 
     def _yield_arg_str(self, context):

@@ -9,6 +9,7 @@ os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path)
 OpenCL = ocl.Backend()
 
 OpenCL.include("<stdio.h>")
+OpenCL.correspondence_check = True
 
 @clq.fn
 def plus(a, b):

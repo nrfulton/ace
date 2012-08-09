@@ -1787,7 +1787,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         func_t = FunctionType(function_name, param_types, return_type)
         
         # Add the function declaration
-        if not (function_name in self._g.unresolved_forward_decls):    
+        if not self._g._variables.has_key(func_t.name):    
             self._g.add_variable(func_t.name, func_t, node)
             self._g.unresolved_forward_decls.append(function_name)
         else:
@@ -2058,7 +2058,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             return Type(name)
 
     def visit_PreprocessorLine(self, node):
-        if re.match("^\#import\ ", node.contents):
+        if re.match("^\#include\ ", node.contents):
             file_name = (node.contents.split(" ")[-1])
             file_name = file_name.replace("\n","")
             file_name = file_name.replace("\"","")
@@ -2075,24 +2075,22 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
                                                "ACE_OCL_INCLUDES",node)
             include_paths = paths.split(";")
             for path in include_paths:
+                f = None
                 try:
                     f = open(path + "/" + file_name)
-                    for line in f:
-                        header_code = "%s%s" % (header_code,line)
-                    #Typecheck the header file, adding to this context.
-                    tc = TypeChecker()
-                    tc_Context = self._g
-                    return tc.check(header_code, tc_Context)
-                    break
-                except Exception as e:
-                    continue     
+                except Excpetion as e:
+                    continue
+                for line in f:
+                    header_code = "%s%s" % (header_code,line)
+                #Typecheck the header file, adding to this context.
+                tc = TypeChecker()
+                tc_Context = self._g
+                tc.check(header_code, tc_Context)
+                break     
             if header_code == "":
                 raise TargetTypeCheckException(
                                             "Could not find file \"%s\" in %s" %
                                             (file_name, paths), node)
-            
-            
-            
         else:
             raise TargetTypeCheckException("Expected preprocessed code "+
                                        "but found a preprocessor line.", node)

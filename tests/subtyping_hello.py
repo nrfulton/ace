@@ -8,7 +8,7 @@ OpenCL = ocl.Backend()
 
 os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path)
 OpenCL.include("<stdio.h>")
-OpenCL.correspondence_check = False
+OpenCL.correspondence_check = True
 
 #TEST: Memoizing Language based on regular expression equivalence
 L1 = lang.ConstrainedString(OpenCL, "(.?)+")

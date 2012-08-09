@@ -6,8 +6,8 @@ import clq
 from clq import TypeResolutionError
 import clq.backends.base_c as base_c
 import clq.extensions.language_types as cstrings
-from pycparserext.typechecker.type_checker import TypeChecker as TDCChecker
-from pycparserext.typechecker.type_checker import Context as TDCContext
+from pycparserext.typechecker import TypeChecker as TDCChecker
+from pycparserext.typechecker import Context as TDCContext
 
 _globals = globals() # used to create lists of types below
 

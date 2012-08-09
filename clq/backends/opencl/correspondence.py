@@ -1,4 +1,4 @@
-import pycparserext.typechecker.type_checker as type_checker
+import pycparserext.typechecker as type_checker
 
 class TypeCorrespondence(object):
     """ Converted between typechecker types, ace types and ocl types.

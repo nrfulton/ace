@@ -7,7 +7,7 @@ import os
 os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path) 
 
 OpenCL = ocl.Backend()
-
+OpenCL.correspondence_check = True
 OpenCL.include("<stdio.h>")
 
 @clq.fn

@@ -1,6 +1,6 @@
 #Generates code for OCL built-in types.
 
-from type_checker import Type
+from pycparserext.typechecker import Type
 from pycparserext.typechecker import GENTYPES
 from pycparserext.typechecker import GENTYPES
 from pycparserext.typechecker import SGENTYPES

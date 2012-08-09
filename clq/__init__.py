@@ -476,7 +476,14 @@ class GenericFnType(VirtualType):
         return concrete_fn.return_type
     
     def generate_Call(self, context, node):
-        return _generic_generate_Call(context, node)
+        r = _generic_generate_Call(context, node)
+        arg_types = tuple(arg.unresolved_type.resolve(context)
+                          for arg in node.args)
+        concrete_fn = self.generic_fn.compile(context.backend, *arg_types)
+        cypy.extend_front(context.program_items, concrete_fn.program_items)
+        return r
+
+        
 
 cypy.intern(GenericFnType)
 GenericFn.Type = GenericFnType
@@ -676,7 +683,7 @@ class Context(object):
         
         self.body = [ ]
         self.stmts = [ ]
-        self.program_items = [ ]
+        self.program_items = cypy.SetList([ ])
         self.expressions = [ ] 
                 
         # used to provide base case for resolving multiple assignments
