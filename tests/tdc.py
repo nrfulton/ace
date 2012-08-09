@@ -20,16 +20,12 @@ def plus(a, b):
         return b
     while a == 1:
         return a
-    
-
-plus_ii = plus.compile(OpenCL, ocl.int, 
-                               ocl.int)
 
 @clq.fn
 def plus2(a,b,c,plus):
     return plus(a,plus(b,c))
 
-plus2_iii = plus2.compile(OpenCL,ocl.int,ocl.int,ocl.int,plus_ii.cl_type)
+plus2_iii = plus2.compile(OpenCL,ocl.int,ocl.int,ocl.int,plus.cl_type)
 
 for p in plus2_iii.program_items:
     print p.code

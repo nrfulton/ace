@@ -113,15 +113,6 @@ def upcast(a,b):
 upcast_ss = upcast.compile(OpenCL, sub_type, super_type)
 assert upcast_ss.return_type == super_type
 
-"""
-
-
-#@clq.fn
-#def downcast(a,b):
-#    return cast(a,b)
-#downcast = downcast.compile(OpenCL, super_type, sub_type)
-#assert downcast.return_type == sub_type
-
 @clq.fn
 def impossiblecast(a,b):
     return cast(a,b)
@@ -132,34 +123,9 @@ try:
 except clq.CodeGenerationError as e:
     assert True #should fail b/c ocl.int doesn't support runtime cast checks.
 
-
-#this is always a downcast, so there should always be a check.
+#unimplemented.
 #@clq.fn
-#def topcast(a):
-#    return cast("some user input",a)
-#topcast = topcast.compile(OpenCL, super_type)
-#assert topcast.return_type == super_type
-
-#print topcast.program_item.code
-
-#This is always an upcast, so there should never be a check.
-@clq.fn
-def bottomcast(a):
-    return cast(a, "string") #how to use a type variable here?
-bottomcast = bottomcast.compile(OpenCL, super_type)
-assert bottomcast.return_type == ocl.string
-
-# FAIL; something's wrong with resolve_Assign.
-#@clq.fn
-#def assign(a,b):
-#    a = b
-#    return a
-#try:
-#    assign_if = assign.compile(OpenCL, super_type, return_sub.cl_type)
-#    #should result in an error; assigning a supertype to a subtype.
-#    assign_if.return_type 
-#    assert False
-#    #assert ocl.float.is_subtype(ocl.int)
-#except clq.TypeResolutionError:
-#    assert True
-"""
+#def bottomcast(a):
+#    return cast(a, "string") #how to use a type variable here?
+#bottomcast = bottomcast.compile(OpenCL, super_type)
+#assert bottomcast.return_type == ocl.string
