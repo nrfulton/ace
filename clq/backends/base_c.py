@@ -31,10 +31,11 @@ class Backend(clq.Backend):
     ######################################################################
     
     def _get_readable_code(self, code):
-        g = cg.CG()
-        g.append(code)
-        g.append(";")
-        return g.code
+        x = cg.CG()
+        x.append(code)
+        x.append(";")
+        str = x.code
+        return str
 
     def _get_ast_from_expr(self, node_code):
         """Returns an AST node containing node's code."""
@@ -44,14 +45,10 @@ class Backend(clq.Backend):
     
     def verify_correspondence(self, context, tdc_context):
         """Checks that all self.expressions match their expected types."""
-        for node in context.expressions:
-            if not isinstance(node, types.StringType):
-                print self._get_readable_code(node.code)
-            continue
-        
+        for node in context.expressions:        
             #For statements, add to context and move on.
             if isinstance(node, types.StringType):
-                ast_node = self._get_ast_from_expr(node.code)
+                ast_node = self._get_ast_from_expr(node)
                 self.get_tdc_checker().check_ast(ast_node, tdc_context)
                 continue
             
@@ -75,33 +72,32 @@ class Backend(clq.Backend):
                 raise ex
     
     def generate_program_item(self, context):
-        print "Generating: " + self._generate_name(context)
-        for f in self.get_tdc_context().functions:
-            print "\t%s" % f
+        print self._generate_name(context)
         
-        
-        #Context used for correspdonece check.
-        tdc_context = self.get_tdc_context()
-        tdc_context.change_scope()
-        
-        #Handle includes.
-        g = cg.CG()
+        #Add any new includes to the context.
+        include_code = ""
         for include in self.includes:
-            g.append("#include %s\n" % include)
-        g.append("\n")
+            include_code = "%s%s" % (include_code, include)
+        include_code = "%s\n" % include_code
         self.includes = []
         
-        #Add includes to correspondence check context
-        self.get_tdc_checker().check(g.code, tdc_context)
-
-        #Correspondence check
-        self.verify_correspondence(context, tdc_context)    
+        if self.correspondence_check:
+            #Correspondence check in an isolated scope.
+            tdc_context = self.get_tdc_context()
+            tdc_context.change_scope()
+            
+            self.get_tdc_checker().check(include_code, tdc_context)
+            #Correspondence check
+            self.verify_correspondence(context, tdc_context)    
+            tdc_context.leave_scope()
         
-        tdc_context.leave_scope()
-        
+        #Generate the function's code.
+        name = self._generate_name(context)
+        g = cg.CG()
+        g.append(include_code)
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
-        name = self._generate_name(context)
+        
         g.append((" ", name, "("))
         g.append(cypy.join(self._yield_arg_str(context), ", "))
         g.append((") {\n", context.tab))
@@ -109,18 +105,19 @@ class Backend(clq.Backend):
         g.append(context.stmts)
         g.append((context.untab, "\n}\n"))
         
-        try:
-            #Add this function to the surrounding scope and generate a return
-            #type.
-            self.get_tdc_checker().check(g.code, self.get_tdc_context())
-            return_tc_type = self.get_tdc_context().get_function(name)
-        except Exception as e:
-            print "Error `%s' raised from generated code %s" % (str(e.message), str(g.code))
-            raise CodeGenerationError("Error `%s' raised from generated code %s" %
-                                      (str(e.message), str(g.code)), None)
+        if self.correspondence_check:
+            try:
+                #Add this function to the surrounding scope and generate a return
+                #type.
+                self.get_tdc_checker().check(g.code, self.get_tdc_context())
+                return_tc_type = self.get_tdc_context().get_function(name)
+            except Exception as e:
+                print "Error `%s' raised from generated code %s" % (str(e.message), str(g.code))
+                raise CodeGenerationError("Error `%s' raised from generated code %s" %
+                                          (str(e.message), str(g.code)), None)
         
         return clq.ProgramItem(name, g.code)
-        
+
     def _yield_arg_str(self, context):
         concrete_fn = context.concrete_fn
         for arg_name, arg_type in zip(concrete_fn.generic_fn.arg_names, 

@@ -392,7 +392,7 @@ def _generic_generate_Call(context, node):
     func = context.visit(node.func)
     
     code = (func.code, "(",
-            cypy.join((arg.code for arg in args), ", "),
+            cypy.join.ed((arg.code for arg in args), ", "),
             ")")
     
     return astx.copy_node(node,
@@ -455,6 +455,7 @@ class Backend(object):
     def __init__(self, name):
         self.name = name
         self.program_items = cypy.SetList([])
+        self.correspondence_check = True #Set to false to disable the check.
 
     def init_context(self, context):
         """Initializes a :class:`context <Context>`."""

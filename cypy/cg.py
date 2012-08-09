@@ -3,7 +3,7 @@
 import re
 
 import cypy
-    
+
 ## Code generator
 class CG(object):
     """Provides a simple, flexible code generator."""
@@ -121,8 +121,6 @@ class CG(object):
                     self.append(code)
             elif cypy.is_iterable(code):
                 for item in code: 
-                    if item.__class__.__name__ == 'generator':
-                        print "here"
                     self.append(item)
             else:
                 self.append(self._convert(code))
