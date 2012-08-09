@@ -4,7 +4,6 @@ from pycparserext.ext_c_generator import OpenCLCGenerator
 import types
 import re #For pattern matching preprocessor lines
 import os #For getting the ACE_OCL_INCLUDES envvar.
-#import cypy
 
 ################################################################################
 #Checker
@@ -1591,10 +1590,16 @@ class Context(object):
             type.enter_scope(self._variables.get(variable_name), self,scope)
         else:    
             type.enter_scope(Variable(variable_name),self,scope)
+    
+    def remove_variable(self, variable):
+        if self._variables.has_key(variable.name): 
+            self._variables.pop(variable.name) #TODO
+        
 
     def change_scope(self):
         """Adds another scope. Everything previously in scope remains so."""
         self._scope.append(0 if len(self._scope) == 0  else self._scope[-1] + 1)
+        
         
     def leave_scope(self):
         """Moves down in scope. Removes all variables that go out of scope."""
@@ -1609,12 +1614,23 @@ class Context(object):
             if scope in t.scope:
                 t.scope.remove(scope)
         #Remove out-of-scope identifiers from identifier list.
+        vars_to_rm = []
         for v in self._variables.values():
-            if len(v.scope) == 0: self._variables.pop(v.name)
+            if len(v.scope) == 0: vars_to_rm.append(v.name)
+        for name in vars_to_rm: self._variables.pop(name)
         #Removed out-of-scope typenames
+        typenames_to_rm = []
         for t in self.typenames:
-            if len(t.scope) == 0: 
-                self.typenames.remove(t)
+            if len(t.scope) == 0: typenames_to_rm.append(t)
+        for t in typenames_to_rm: self.typenames.remove(t) 
+        #Remove out-of-scope functions.
+        funcs_to_rm = []
+        for f in self.functions:
+            if len(f.scope) == 0: funcs_to_rm.append(f)
+        for f in funcs_to_rm: self.functions.remove(f)
+        
+        self._scope.pop()
+                
 
 
 ################################################################################
@@ -1809,7 +1825,8 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
         self._g.leave_scope()
         
         #Add the function to the surrounding scope.
-        self._g.add_variable(function_t.name, function_t, node)
+        if not self._g._variables.has_key(function_t.name):
+            self._g.add_variable(function_t.name, function_t, node)
         
         return function_t
     
@@ -2041,7 +2058,7 @@ class OpenCLTypeChecker(pycparser.c_ast.NodeVisitor):
             return Type(name)
 
     def visit_PreprocessorLine(self, node):
-        if re.match("^\#include\ ", node.contents):
+        if re.match("^\#import\ ", node.contents):
             file_name = (node.contents.split(" ")[-1])
             file_name = file_name.replace("\n","")
             file_name = file_name.replace("\"","")

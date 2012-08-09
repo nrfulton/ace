@@ -8,6 +8,7 @@ OpenCL = ocl.Backend()
 
 os.environ['ACE_OCL_INCLUDES'] = ';'.join(sys.path)
 OpenCL.include("<stdio.h>")
+OpenCL.correspondence_check = False
 
 #TEST: Memoizing Language based on regular expression equivalence
 L1 = lang.ConstrainedString(OpenCL, "(.?)+")
@@ -21,8 +22,6 @@ assert L1 != L3
 subtype_of_l1 = lang.ConstrainedString(OpenCL, ".+")
 assert subtype_of_l1 != L1
 
-#TODO test to make sure memoizing is backend-specific.
-
 #TEST: Reflection and grammar inclusion
 L1 = lang.ConstrainedString(OpenCL,".")
 L2 = lang.ConstrainedString(OpenCL,".+")
@@ -35,27 +34,25 @@ assert L2.is_subtype(L1)
 @clq.fn
 def test_return(a):
     return a
-test_return = test_return.compile(OpenCL, L1)
-assert test_return.return_type == L1
+test_return_l1 = test_return.compile(OpenCL, L1)
+assert test_return_l1.return_type == L1
 
 #TEST: Function returning a Language
 @clq.fn
 def test(a):
     return a
-test1 = test.compile(OpenCL,  L1)
-assert test1.return_type == L1
+test_l1 = test.compile(OpenCL,  L1)
+assert test_l1.return_type == L1
 L3 = lang.ConstrainedString(OpenCL, L1._regex)
-test2 = test.compile(OpenCL, L3)
-assert test2.return_type == L3
+test_l3 = test.compile(OpenCL, L3)
+assert test_l3.return_type == L3
 
 #TEST: Language factor interning. This fails b/c interning isn't working yet.
 @clq.fn
 def test2(a):
     return a
-test2 = test2.compile(OpenCL, lang.ConstrainedString(OpenCL, L1._regex))
-assert test2.return_type == L1
-
-
+test2_l1 = test2.compile(OpenCL, lang.ConstrainedString(OpenCL, L1._regex))
+assert test2_l1.return_type == L1
 
 # Note: rhs + lhs for Language types has type 
 # Language<(rhs._regex)(lhs._regex)> and requires rhs <: lhs 
@@ -67,8 +64,9 @@ super = lang.ConstrainedString(OpenCL, ".+")
 @clq.fn
 def test_concatenation(a,b):
     return a + b
-test_concatenation = test_concatenation.compile(OpenCL, super, sub)
-assert test_concatenation.return_type == lang.ConstrainedString(OpenCL,"..+")  
+test_concatenation_super_sub = test_concatenation.compile(OpenCL, super, sub)
+assert test_concatenation_super_sub.return_type == \
+            lang.ConstrainedString(OpenCL,"..+")  
 
 #TEST: Subtyping
 super_type = lang.ConstrainedString(OpenCL, "a+")
@@ -77,32 +75,32 @@ sub_type   = lang.ConstrainedString(OpenCL, "a")
 @clq.fn
 def return_sub(x):
     return x
-return_subc = return_sub.compile(OpenCL, sub_type)
-assert return_subc.return_type == sub_type
+return_sub_s = return_sub.compile(OpenCL, sub_type)
+assert return_sub_s.return_type == sub_type
 
 @clq.fn
 def assign_to_sub(x,y):
     x = y
     return x
-assign_to_sub = assign_to_sub.compile(OpenCL, super_type, sub_type)
-assert assign_to_sub.return_type == super_type
+assign_to_sub_sup_sub = assign_to_sub.compile(OpenCL, super_type, sub_type)
+assert assign_to_sub_sup_sub.return_type == super_type
 
 @clq.fn
 def return_super(a, b, return_sub):
     return return_sub(b) + a
-return_super = return_super.compile(OpenCL, 
+return_super_ssr = return_super.compile(OpenCL, 
                                     super_type, 
                                     sub_type, 
                                     return_sub.cl_type)
-assert return_super.return_type == lang.ConstrainedString(OpenCL, "aa+")
+assert return_super_ssr.return_type == lang.ConstrainedString(OpenCL, "aa+")
 
-# The example below fails because the lhs must be a subtype of the rhs.
+#Should fail -- supertype <: subtype.
 @clq.fn
 def fail_check(a, return_sub):
     return return_sub(a) + a
 try: 
-    fail_check = fail_check.compile(OpenCL, super_type, return_sub.cl_type)
-    fail_check.return_type #force resolution
+    fail_check_sr = fail_check.compile(OpenCL, super_type, return_sub_s.cl_type)
+    fail_check_sr.return_type #force resolution
     assert False
 except clq.TypeResolutionError:
     assert True
@@ -112,8 +110,11 @@ except clq.TypeResolutionError:
 @clq.fn
 def upcast(a,b):
     return cast(a,b)
-upcast = upcast.compile(OpenCL, sub_type, super_type)
-assert upcast.return_type == super_type
+upcast_ss = upcast.compile(OpenCL, sub_type, super_type)
+assert upcast_ss.return_type == super_type
+
+"""
+
 
 #@clq.fn
 #def downcast(a,b):
@@ -161,3 +162,4 @@ assert bottomcast.return_type == ocl.string
 #    #assert ocl.float.is_subtype(ocl.int)
 #except clq.TypeResolutionError:
 #    assert True
+"""

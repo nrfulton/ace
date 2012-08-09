@@ -3,12 +3,11 @@ import ast as _ast
 import cypy
 import cypy.astx as astx
 import cypy.cg as cg
-import copy
-
 import clq
 from clq import TypeResolutionError, CodeGenerationError
 from clq.backends.opencl.correspondence import TypeCorrespondence 
-import pycparserext.typechecker as type_checker
+import pycparserext.typechecker
+from pycparser.plyparser import ParseError
 import types
 
 class Backend(clq.Backend):
@@ -42,6 +41,8 @@ class Backend(clq.Backend):
         code = "void dummy_func() { %s } " % self._get_readable_code(node_code)
         ast = self.get_tdc_checker().get_ast(code)
         return ast.ext[0].body.block_items[0] #extract expr from ast.
+
+            
     
     def verify_correspondence(self, context, tdc_context):
         """Checks that all self.expressions match their expected types."""
@@ -72,27 +73,35 @@ class Backend(clq.Backend):
                 raise ex
     
     def generate_program_item(self, context):
-        #Add any new includes to the context.
-        include_code = ""
-        for include in self.includes:
-            include_code = "%s%s" % (include_code, include)
-        include_code = "%s\n" % include_code
-        self.includes = []
+        #Genereate code for any new includes.        
+        include_code = None
+        if len(self.includes) > 0:
+            include_code = ""
+            for include in self.includes:
+                include_code = "%s#include %s" % (include_code, include)
+            include_code = "%s\n" % include_code
+            self.includes = []
         
         if self.correspondence_check:
             #Correspondence check in an isolated scope.
             tdc_context = self.get_tdc_context()
             tdc_context.change_scope()
             
-            self.get_tdc_checker().check(include_code, tdc_context)
-            #Correspondence check
+            for function in tdc_context.functions:
+                print function.name
+            print "--"
+        
+            #Check included code.
+            if not include_code == None:
+                self.get_tdc_checker().check(include_code, tdc_context)
+
             self.verify_correspondence(context, tdc_context)    
             tdc_context.leave_scope()
         
         #Generate the function's code.
         name = self._generate_name(context)
         g = cg.CG()
-        g.append(include_code)
+        if not include_code == None: g.append(include_code)
         g.append(cypy.join(cypy.cons(context.modifiers, 
                                      (context.return_type.name,)), " "))
         

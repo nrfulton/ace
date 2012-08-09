@@ -4,7 +4,7 @@ import cypy
 import cypy.astx as astx
 
 from clq import (InvalidOperationError, TypeResolutionError, 
-                 Context, ConcreteFnType, GenericFnType)
+                 Context, ConcreteFnType, GenericFnType, CastFnType)
 
 class GenericFnVisitor(_ast.NodeVisitor):
     """A visitor that produces a copy of a generic function's abstract syntax 
@@ -680,7 +680,11 @@ class NameURT(UnresolvedType):
     def resolve(self, context):
         node = self.node
         id = node.id
-        
+
+        # handle special cases
+        if id == "cast":
+            return CastFnType(id)
+
         try:
             # is it an argument?
             return context.concrete_fn.arg_map[id]

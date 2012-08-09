@@ -1,6 +1,6 @@
 import pycparser
-import pycparserext.typechecker.type_checker as checker
-from pycparserext.typechecker.type_checker import Context
+import pycparserext.typechecker as checker
+from pycparserext.typechecker import Context
 from pycparserext.ext_c_parser import OpenCLCParser
 from pycparserext.ext_c_generator import OpenCLCGenerator
 import traceback
@@ -22,7 +22,8 @@ def check(code, expect_success=True, show_trace=False, show_ast=False):
         else:
             if show_trace: traceback.print_exc()
             print "ERROR: %s" % e.message
-            assert False #false negatives   
+            assert False #false negatives  
+    return g 
 
 ################################################################################
 #Code Snippets
@@ -95,6 +96,12 @@ int main() {
 }
 """,False)#redeclaring main as a non-function.
 
+
+ctx = check("""
+void func(int x) {
+}""") 
+assert len(ctx._scope) == 1 #x should be out of scope.
+
 #Ellisis
 check("""
 int func(int x, char y, ...) { return func(1,'c',2,3,4); }
@@ -116,7 +123,7 @@ int function(int);
 int function(int x) {
     return x+1;
 }
-""")
+""",True,True)
 
 check(stuff + """
 int function(int);
@@ -126,7 +133,7 @@ int function(int);
 int function(int x) {
     return x+1;
 }
-""") #appropriate redecl of fwd decls
+""",True,True) #appropriate redecl of fwd decls
 
 check(stuff + """
 stuff function(int);
